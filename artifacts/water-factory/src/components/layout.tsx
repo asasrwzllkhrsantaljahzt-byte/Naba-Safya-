@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   Droplets, LayoutDashboard, ShoppingCart, Truck, Package,
   Receipt, Wallet, BarChart3, ChevronDown, ChevronLeft,
-  UserCog, UsersRound, Calculator
+  UserCog, UsersRound, Calculator, Settings
 } from "lucide-react";
 
 type SubItem = { name: string; href: string };
@@ -69,6 +69,7 @@ const nav: NavItem[] = [
     ]
   },
   { name: "التقارير", icon: BarChart3, href: "/reports" },
+  { name: "الإعدادات", icon: Settings, href: "/settings" },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

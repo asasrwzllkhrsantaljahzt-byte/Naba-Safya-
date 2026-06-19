@@ -19,11 +19,13 @@ import obligationsRouter from "./obligations";
 import authRouter from "./auth";
 import repPortalRouter from "./repPortal";
 import operationalCostsRouter from "./operationalCosts";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(settingsRouter);
 router.use(repPortalRouter);
 router.use(operationalCostsRouter);
 router.use(productsRouter);

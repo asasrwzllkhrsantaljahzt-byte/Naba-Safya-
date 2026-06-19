@@ -24,6 +24,7 @@ import Obligations from "@/pages/obligations";
 import OperationalCosts from "@/pages/operational-costs";
 import RepLogin from "@/pages/rep-login";
 import RepPortal from "@/pages/rep-portal";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { queryClient } from "@/lib/utils";
 
@@ -50,6 +51,7 @@ function AdminRouter() {
         <Route path="/treasury" component={Treasury} />
         <Route path="/obligations" component={Obligations} />
         <Route path="/reports" component={Reports} />
+        <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

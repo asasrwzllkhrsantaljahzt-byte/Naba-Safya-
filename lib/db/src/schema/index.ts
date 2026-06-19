@@ -15,3 +15,4 @@ export * from "./costCenters";
 export * from "./repCustody";
 export * from "./obligations";
 export * from "./operationalCosts";
+export * from "./settings";
