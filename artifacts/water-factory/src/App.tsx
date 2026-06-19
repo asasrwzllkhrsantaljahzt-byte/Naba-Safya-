@@ -2,6 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { Layout } from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
 import Purchases from "@/pages/purchases";
@@ -25,6 +26,8 @@ import OperationalCosts from "@/pages/operational-costs";
 import RepLogin from "@/pages/rep-login";
 import RepPortal from "@/pages/rep-portal";
 import Settings from "@/pages/settings";
+import Login from "@/pages/login";
+import Users from "@/pages/users";
 import NotFound from "@/pages/not-found";
 import { queryClient } from "@/lib/utils";
 
@@ -52,6 +55,7 @@ function AdminRouter() {
         <Route path="/obligations" component={Obligations} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={Settings} />
+        <Route path="/users" component={Users} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -62,14 +66,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Switch>
-            <Route path="/rep-login" component={RepLogin} />
-            <Route path="/rep-portal" component={RepPortal} />
-            <Route component={AdminRouter} />
-          </Switch>
-        </WouterRouter>
-        <Toaster />
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Switch>
+              <Route path="/rep-login" component={RepLogin} />
+              <Route path="/rep-portal" component={RepPortal} />
+              <Route path="/login" component={Login} />
+              <Route component={AdminRouter} />
+            </Switch>
+          </WouterRouter>
+          <Toaster />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

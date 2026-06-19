@@ -27,6 +27,23 @@ router.post("/cost-centers", async (req, res) => {
   } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في إضافة مركز التكلفة" }); }
 });
 
+router.patch("/cost-centers/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { name, description, budget, notes } = req.body;
+    const updates: any = {};
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (budget !== undefined) updates.budget = String(budget);
+    if (notes !== undefined) updates.notes = notes;
+    const [center] = await db.update(costCentersTable).set(updates).where(eq(costCentersTable.id, id)).returning();
+    if (!center) return res.status(404).json({ error: "مركز التكلفة غير موجود" });
+    const expenses = await db.select().from(costCenterExpensesTable).where(eq(costCenterExpensesTable.costCenterId, id));
+    const totalSpent = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
+    res.json({ ...center, budget: parseFloat(center.budget ?? "0"), createdAt: center.createdAt.toISOString(), totalSpent });
+  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في تحديث مركز التكلفة" }); }
+});
+
 router.delete("/cost-centers/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -52,7 +69,6 @@ router.post("/cost-centers/:id/expenses", async (req, res) => {
     const [expense] = await db.insert(costCenterExpensesTable).values({
       costCenterId, costCenterName: center.name, date, category, description, amount: String(amount), notes,
     }).returning();
-    // Auto deduct from treasury
     await db.insert(treasuryTransactionsTable).values({
       date, type: "out", amount: String(amount),
       description: `مصروف [${center.name}]: ${description}`,

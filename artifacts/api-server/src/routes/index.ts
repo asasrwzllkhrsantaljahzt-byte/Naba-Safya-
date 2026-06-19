@@ -17,6 +17,7 @@ import costCentersRouter from "./costCenters";
 import repCustodyRouter from "./repCustody";
 import obligationsRouter from "./obligations";
 import authRouter from "./auth";
+import adminAuthRouter from "./adminAuth";
 import repPortalRouter from "./repPortal";
 import operationalCostsRouter from "./operationalCosts";
 import settingsRouter from "./settings";
@@ -25,6 +26,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(adminAuthRouter);
 router.use(settingsRouter);
 router.use(repPortalRouter);
 router.use(operationalCostsRouter);

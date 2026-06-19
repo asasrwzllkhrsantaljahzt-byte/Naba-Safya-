@@ -1,20 +1,22 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Edit } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-
 const EXPENSE_CATS = ["إيجار", "رواتب", "مواد خام", "كهرباء", "وقود", "صيانة", "مواصلات", "أخرى"];
 
 export default function CostCenters() {
+  const { can } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
   const [expOpen, setExpOpen] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const emptyForm = { name: "", description: "", budget: 0, notes: "" };
@@ -38,6 +40,12 @@ export default function CostCenters() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["cost-centers"] }); setIsOpen(false); setForm(emptyForm); },
   });
 
+  const update = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      fetch(`${BASE}/api/cost-centers/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["cost-centers"] }); setEditItem(null); },
+  });
+
   const addExpense = useMutation({
     mutationFn: ({ id, data }: { id: number; data: typeof expForm }) => fetch(`${BASE}/api/cost-centers/${id}/expenses`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["cost-center-expenses", expanded] }); queryClient.invalidateQueries({ queryKey: ["cost-centers"] }); setExpOpen(null); setExpForm(emptyExpForm); },
@@ -52,22 +60,19 @@ export default function CostCenters() {
     <div className="space-y-5">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">مراكز التكلفة</h1>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild><Button><Plus className="ml-2 w-4 h-4" /> إضافة مركز</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>إضافة مركز تكلفة</DialogTitle></DialogHeader>
-            <form onSubmit={e => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
-              <div className="space-y-2"><label className="text-sm font-medium">اسم المركز</label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">الوصف</label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">الميزانية</label><Input type="number" min="0" step="0.01" value={form.budget} onChange={e => setForm({ ...form, budget: Number(e.target.value) })} /></div>
-              <Button type="submit" className="w-full" disabled={create.isPending}>حفظ</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {can("edit") && (
+          <Button onClick={() => { setForm(emptyForm); setIsOpen(true); }}>
+            <Plus className="ml-2 w-4 h-4" /> إضافة مركز
+          </Button>
+        )}
       </div>
 
       <div className="space-y-3">
-        {isLoading ? <p className="text-center py-8 text-muted-foreground">جاري التحميل...</p> : centers.length === 0 ? <p className="text-center py-8 text-muted-foreground">لا توجد مراكز تكلفة</p> : centers.map((c: any) => (
+        {isLoading ? (
+          <p className="text-center py-8 text-muted-foreground">جاري التحميل...</p>
+        ) : centers.length === 0 ? (
+          <p className="text-center py-8 text-muted-foreground">لا توجد مراكز تكلفة</p>
+        ) : centers.map((c: any) => (
           <Card key={c.id} className="overflow-hidden">
             <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
               <div>
@@ -80,12 +85,21 @@ export default function CostCenters() {
                   <div className="font-bold">{c.totalSpent?.toLocaleString()} / {c.budget?.toLocaleString()} ر.س</div>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setExpOpen(c.id); }}>
-                    <Plus className="w-3.5 h-3.5 ml-1" /> إضافة مصروف
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); confirm("حذف المركز؟") && remove.mutate(c.id); }}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  {can("edit") && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setExpOpen(c.id); }}>
+                        <Plus className="w-3.5 h-3.5 ml-1" /> إضافة مصروف
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); setEditItem({ ...c }); }}>
+                        <Edit className="w-4 h-4 text-blue-600" />
+                      </Button>
+                    </>
+                  )}
+                  {can("delete") && (
+                    <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); confirm("حذف المركز وجميع مصروفاته؟") && remove.mutate(c.id); }}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  )}
                   <ChevronDown className={`w-5 h-5 transition-transform ${expanded === c.id ? "rotate-180" : ""}`} />
                 </div>
               </div>
@@ -115,6 +129,35 @@ export default function CostCenters() {
         ))}
       </div>
 
+      {/* Create Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>إضافة مركز تكلفة</DialogTitle></DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
+            <div className="space-y-2"><label className="text-sm font-medium">اسم المركز</label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">الوصف</label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">الميزانية</label><Input type="number" min="0" step="0.01" value={form.budget} onChange={e => setForm({ ...form, budget: Number(e.target.value) })} /></div>
+            <Button type="submit" className="w-full" disabled={create.isPending}>حفظ</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editItem} onOpenChange={v => !v && setEditItem(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>تعديل مركز التكلفة</DialogTitle></DialogHeader>
+          {editItem && (
+            <form onSubmit={e => { e.preventDefault(); update.mutate({ id: editItem.id, data: { name: editItem.name, description: editItem.description, budget: editItem.budget, notes: editItem.notes } }); }} className="space-y-4">
+              <div className="space-y-2"><label className="text-sm font-medium">اسم المركز</label><Input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })} required /></div>
+              <div className="space-y-2"><label className="text-sm font-medium">الوصف</label><Input value={editItem.description || ""} onChange={e => setEditItem({ ...editItem, description: e.target.value })} /></div>
+              <div className="space-y-2"><label className="text-sm font-medium">الميزانية</label><Input type="number" min="0" step="0.01" value={editItem.budget} onChange={e => setEditItem({ ...editItem, budget: Number(e.target.value) })} /></div>
+              <Button type="submit" className="w-full" disabled={update.isPending}>حفظ التغييرات</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Expense Dialog */}
       <Dialog open={!!expOpen} onOpenChange={open => !open && setExpOpen(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>إضافة مصروف لمركز التكلفة</DialogTitle></DialogHeader>

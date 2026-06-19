@@ -38,6 +38,25 @@ router.post("/obligations", async (req, res) => {
   } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في إضافة الالتزام" }); }
 });
 
+// General edit for an obligation
+router.patch("/obligations/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { date, dueDate, type, description, partyName, amount, notes } = req.body;
+    const updates: any = {};
+    if (date !== undefined) updates.date = date;
+    if (dueDate !== undefined) updates.dueDate = dueDate;
+    if (type !== undefined) updates.type = type;
+    if (description !== undefined) updates.description = description;
+    if (partyName !== undefined) updates.partyName = partyName;
+    if (amount !== undefined) updates.amount = String(amount);
+    if (notes !== undefined) updates.notes = notes;
+    const [record] = await db.update(obligationsTable).set(updates).where(eq(obligationsTable.id, id)).returning();
+    if (!record) return res.status(404).json({ error: "الالتزام غير موجود" });
+    res.json(fmt(record));
+  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في تحديث الالتزام" }); }
+});
+
 // Pay an obligation (full or partial)
 router.patch("/obligations/:id/pay", async (req, res) => {
   try {

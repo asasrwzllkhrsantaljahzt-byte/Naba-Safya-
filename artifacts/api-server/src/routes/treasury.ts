@@ -48,4 +48,33 @@ router.post("/treasury/transactions", async (req, res) => {
   }
 });
 
+router.patch("/treasury/transactions/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { date, type, amount, description } = req.body;
+    const updates: any = {};
+    if (date !== undefined) updates.date = date;
+    if (type !== undefined) updates.type = type;
+    if (amount !== undefined) updates.amount = String(amount);
+    if (description !== undefined) updates.description = description;
+    const [transaction] = await db.update(treasuryTransactionsTable).set(updates).where(eq(treasuryTransactionsTable.id, id)).returning();
+    if (!transaction) return res.status(404).json({ error: "الحركة غير موجودة" });
+    res.json({ ...transaction, amount: parseFloat(transaction.amount), createdAt: transaction.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في تحديث الحركة" });
+  }
+});
+
+router.delete("/treasury/transactions/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(treasuryTransactionsTable).where(eq(treasuryTransactionsTable.id, id));
+    res.status(204).end();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في حذف الحركة" });
+  }
+});
+
 export default router;

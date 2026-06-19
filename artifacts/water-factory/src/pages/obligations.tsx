@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, CreditCard } from "lucide-react";
+import { Plus, Trash2, CreditCard, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -16,13 +17,16 @@ const typeLabels: Record<string, string> = { salary: "راتب", supplier: "مو
 const statusBadge: Record<string, "default" | "secondary" | "destructive"> = { pending: "destructive", paid: "default", partial: "secondary" };
 const statusLabels: Record<string, string> = { pending: "معلق", paid: "مدفوع", partial: "جزئي" };
 
+const emptyForm = { date: new Date().toISOString().split("T")[0], dueDate: "", type: "other", description: "", partyName: "", amount: 0, notes: "" };
+
 export default function Obligations() {
+  const { can } = useAuth();
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
   const [payOpen, setPayOpen] = useState<any>(null);
   const [payAmount, setPayAmount] = useState(0);
-  const emptyForm = { date: new Date().toISOString().split("T")[0], dueDate: "", type: "other", description: "", partyName: "", amount: 0, notes: "" };
   const [form, setForm] = useState(emptyForm);
 
   const { data: result = { records: [], total: 0, paid: 0, remaining: 0 }, isLoading } = useQuery({
@@ -31,8 +35,14 @@ export default function Obligations() {
   });
 
   const create = useMutation({
-    mutationFn: (data: typeof form) => fetch(`${BASE}/api/obligations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
+    mutationFn: (data: typeof emptyForm) => fetch(`${BASE}/api/obligations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["obligations"] }); setIsOpen(false); setForm(emptyForm); },
+  });
+
+  const update = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      fetch(`${BASE}/api/obligations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["obligations"] }); setEditItem(null); },
   });
 
   const pay = useMutation({
@@ -45,40 +55,41 @@ export default function Obligations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["obligations"] }),
   });
 
+  const ObligationForm = ({ data, setData, onSubmit, pending }: any) => (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2"><label className="text-sm font-medium">التاريخ</label><Input type="date" value={data.date} onChange={e => setData({ ...data, date: e.target.value })} required /></div>
+        <div className="space-y-2"><label className="text-sm font-medium">تاريخ الاستحقاق</label><Input type="date" value={data.dueDate || ""} onChange={e => setData({ ...data, dueDate: e.target.value })} /></div>
+      </div>
+      <div className="space-y-2"><label className="text-sm font-medium">النوع</label>
+        <Select value={data.type} onValueChange={v => setData({ ...data, type: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="salary">راتب</SelectItem>
+            <SelectItem value="supplier">مورد</SelectItem>
+            <SelectItem value="rent">إيجار</SelectItem>
+            <SelectItem value="loan">قرض</SelectItem>
+            <SelectItem value="other">أخرى</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2"><label className="text-sm font-medium">البيان</label><Input value={data.description} onChange={e => setData({ ...data, description: e.target.value })} required /></div>
+      <div className="space-y-2"><label className="text-sm font-medium">اسم الطرف (مورد / موظف)</label><Input value={data.partyName || ""} onChange={e => setData({ ...data, partyName: e.target.value })} /></div>
+      <div className="space-y-2"><label className="text-sm font-medium">المبلغ</label><Input type="number" min="0" step="0.01" value={data.amount} onChange={e => setData({ ...data, amount: Number(e.target.value) })} required /></div>
+      <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={data.notes || ""} onChange={e => setData({ ...data, notes: e.target.value })} /></div>
+      <Button type="submit" className="w-full" disabled={pending}>حفظ</Button>
+    </form>
+  );
+
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">الالتزامات</h1>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild><Button><Plus className="ml-2 w-4 h-4" /> إضافة التزام</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>إضافة التزام جديد</DialogTitle></DialogHeader>
-            <form onSubmit={e => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><label className="text-sm font-medium">التاريخ</label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required /></div>
-                <div className="space-y-2"><label className="text-sm font-medium">تاريخ الاستحقاق</label><Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">النوع</label>
-                <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="salary">راتب</SelectItem>
-                    <SelectItem value="supplier">مورد</SelectItem>
-                    <SelectItem value="rent">إيجار</SelectItem>
-                    <SelectItem value="loan">قرض</SelectItem>
-                    <SelectItem value="other">أخرى</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><label className="text-sm font-medium">البيان</label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">اسم الطرف (مورد / موظف)</label><Input value={form.partyName} onChange={e => setForm({ ...form, partyName: e.target.value })} /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">المبلغ</label><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
-              <Button type="submit" className="w-full" disabled={create.isPending}>حفظ</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {can("edit") && (
+          <Button onClick={() => { setForm(emptyForm); setIsOpen(true); }}>
+            <Plus className="ml-2 w-4 h-4" /> إضافة التزام
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -161,9 +172,16 @@ export default function Obligations() {
                         </DialogContent>
                       </Dialog>
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => confirm("حذف الالتزام؟") && remove.mutate(r.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {can("edit") && (
+                      <Button variant="ghost" size="icon" onClick={() => setEditItem({ ...r })}>
+                        <Edit className="w-4 h-4 text-blue-600" />
+                      </Button>
+                    )}
+                    {can("delete") && (
+                      <Button variant="ghost" size="icon" onClick={() => confirm("حذف الالتزام؟") && remove.mutate(r.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -171,6 +189,24 @@ export default function Obligations() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>إضافة التزام جديد</DialogTitle></DialogHeader>
+          <ObligationForm data={form} setData={setForm} onSubmit={(e: any) => { e.preventDefault(); create.mutate(form); }} pending={create.isPending} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editItem} onOpenChange={v => !v && setEditItem(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>تعديل الالتزام</DialogTitle></DialogHeader>
+          {editItem && (
+            <ObligationForm data={editItem} setData={setEditItem} onSubmit={(e: any) => { e.preventDefault(); update.mutate({ id: editItem.id, data: { date: editItem.date, dueDate: editItem.dueDate, type: editItem.type, description: editItem.description, partyName: editItem.partyName, amount: Number(editItem.amount), notes: editItem.notes } }); }} pending={update.isPending} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

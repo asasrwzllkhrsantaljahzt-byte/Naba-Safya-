@@ -1,0 +1,1 @@
+- [Admin Auth System](admin-auth.md) — HMAC-SHA256 tokens in localStorage, default admin auto-created, 3 roles: admin/manager/viewer

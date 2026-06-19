@@ -43,6 +43,26 @@ router.post("/operational-costs", async (req, res) => {
   }
 });
 
+router.patch("/operational-costs/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { date, month, category, description, amount, notes } = req.body;
+    const updates: any = {};
+    if (date !== undefined) updates.date = date;
+    if (month !== undefined) updates.month = month;
+    if (category !== undefined) updates.category = category;
+    if (description !== undefined) updates.description = description;
+    if (amount !== undefined) updates.amount = String(amount);
+    if (notes !== undefined) updates.notes = notes;
+    const [cost] = await db.update(operationalCostsTable).set(updates).where(eq(operationalCostsTable.id, id)).returning();
+    if (!cost) return res.status(404).json({ error: "التكلفة غير موجودة" });
+    res.json({ ...cost, amount: parseFloat(cost.amount), createdAt: cost.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في تحديث التكلفة" });
+  }
+});
+
 router.delete("/operational-costs/:id", async (req, res) => {
   try {
     await db.delete(operationalCostsTable).where(eq(operationalCostsTable.id, parseInt(req.params.id)));
@@ -53,52 +73,56 @@ router.delete("/operational-costs/:id", async (req, res) => {
   }
 });
 
-// Per-bottle cost analysis
 router.get("/operational-costs/analysis", async (req, res) => {
   try {
     const { month } = req.query as { month?: string };
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
 
-    let costs = await db.select().from(operationalCostsTable);
-    if (month) costs = costs.filter((c) => c.month === month);
+    const costs = await db.select().from(operationalCostsTable);
+    const monthlyCosts = costs.filter((c) => c.month === targetMonth);
+    const totalCost = monthlyCosts.reduce((s, c) => s + parseFloat(c.amount), 0);
 
-    const totalCost = costs.reduce((s, c) => s + parseFloat(c.amount), 0);
+    const sales = await db.select().from(salesTable);
+    const monthlySales = sales.filter((s) => s.date.startsWith(targetMonth));
+    const totalRevenue = monthlySales.reduce((s, sale) => s + parseFloat(sale.grandTotal), 0);
+    const totalBottles = monthlySales.reduce((s, sale) => {
+      const items = sale.items as Array<{ quantity: number }>;
+      return s + items.reduce((sum, item) => sum + item.quantity, 0);
+    }, 0);
 
-    // By category
-    const byCategory: Record<string, number> = {};
-    for (const c of costs) {
-      byCategory[c.category] = (byCategory[c.category] ?? 0) + parseFloat(c.amount);
-    }
+    const transactions = await db.select().from(inventoryTransactionsTable);
+    const monthlyIn = transactions.filter((t) => t.type === "in" && t.date.startsWith(targetMonth));
+    const bottlesProduced = monthlyIn.reduce((s, t) => s + t.quantity, 0);
 
-    // Bottles produced this month (inventory IN from purchases)
-    let txns = await db.select().from(inventoryTransactionsTable);
-    if (month) txns = txns.filter((t) => t.date.startsWith(month));
-    const bottlesProduced = txns.filter((t) => t.type === "in" && t.referenceType === "purchase").reduce((s, t) => s + t.quantity, 0);
-    const bottlesSold = txns.filter((t) => t.type === "out" && t.referenceType === "sale").reduce((s, t) => s + t.quantity, 0);
-
-    // Revenue
-    let sales = await db.select().from(salesTable);
-    if (month) sales = sales.filter((s) => s.date.startsWith(month));
-    const revenue = sales.reduce((s, sale) => s + parseFloat(sale.grandTotal), 0);
-    const avgPrice = bottlesSold > 0 ? revenue / bottlesSold : 0;
     const costPerBottle = bottlesProduced > 0 ? totalCost / bottlesProduced : 0;
-    const profitPerBottle = avgPrice - costPerBottle;
-    const grossProfit = revenue - totalCost;
+    const revenuePerBottle = totalBottles > 0 ? totalRevenue / totalBottles : 0;
+    const profitPerBottle = revenuePerBottle - costPerBottle;
+    const grossProfit = totalRevenue - totalCost;
+
+    const byCategory = Object.entries(
+      monthlyCosts.reduce((acc, c) => {
+        const key = c.category;
+        acc[key] = (acc[key] || 0) + parseFloat(c.amount);
+        return acc;
+      }, {} as Record<string, number>)
+    ).map(([category, amount]) => ({
+      category,
+      label: CATEGORY_LABELS[category] || category,
+      amount,
+      pct: totalCost > 0 ? Math.round((amount / totalCost) * 100) : 0,
+    }));
 
     res.json({
+      month: targetMonth,
       totalCost,
-      byCategory: Object.entries(byCategory).map(([cat, amt]) => ({
-        category: cat,
-        label: CATEGORY_LABELS[cat] ?? cat,
-        amount: amt,
-        percentage: totalCost > 0 ? ((amt / totalCost) * 100).toFixed(1) : "0",
-      })),
+      totalRevenue,
+      grossProfit,
       bottlesProduced,
-      bottlesSold,
-      revenue,
-      avgPrice: parseFloat(avgPrice.toFixed(2)),
-      costPerBottle: parseFloat(costPerBottle.toFixed(2)),
-      profitPerBottle: parseFloat(profitPerBottle.toFixed(2)),
-      grossProfit: parseFloat(grossProfit.toFixed(2)),
+      totalBottlesSold: totalBottles,
+      costPerBottle: parseFloat(costPerBottle.toFixed(4)),
+      revenuePerBottle: parseFloat(revenuePerBottle.toFixed(4)),
+      profitPerBottle: parseFloat(profitPerBottle.toFixed(4)),
+      byCategory,
     });
   } catch (err) {
     req.log.error(err);

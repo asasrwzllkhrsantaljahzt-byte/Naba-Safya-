@@ -1,0 +1,145 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import crypto from "crypto";
+
+const router = Router();
+const SECRET = process.env.SESSION_SECRET || "water-factory-secret";
+
+const hashPassword = (pw: string) =>
+  crypto.createHmac("sha256", SECRET).update(pw).digest("hex");
+
+const makeToken = (userId: number, role: string) => {
+  const payload = JSON.stringify({ userId, role, ts: Date.now() });
+  const b64 = Buffer.from(payload).toString("base64url");
+  const sig = crypto.createHmac("sha256", SECRET).update(b64).digest("hex");
+  return `${b64}.${sig}`;
+};
+
+export const verifyAdminToken = (token: string): { userId: number; role: string } | null => {
+  try {
+    const [b64, sig] = token.split(".");
+    const expected = crypto.createHmac("sha256", SECRET).update(b64).digest("hex");
+    if (sig !== expected) return null;
+    return JSON.parse(Buffer.from(b64, "base64url").toString());
+  } catch {
+    return null;
+  }
+};
+
+export const adminAuth = (req: any, res: any, next: any) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) return res.status(401).json({ error: "غير مصرح" });
+  const payload = verifyAdminToken(auth.slice(7));
+  if (!payload) return res.status(401).json({ error: "رمز غير صالح" });
+  req.adminUser = payload;
+  next();
+};
+
+export const requireAdmin = (req: any, res: any, next: any) => {
+  adminAuth(req, res, () => {
+    if (req.adminUser?.role !== "admin") return res.status(403).json({ error: "يتطلب صلاحية مشرف" });
+    next();
+  });
+};
+
+async function ensureDefaultAdmin() {
+  try {
+    const users = await db.select().from(usersTable);
+    if (users.length === 0) {
+      await db.insert(usersTable).values({
+        username: "admin",
+        passwordHash: hashPassword("admin123"),
+        fullName: "المشرف الرئيسي",
+        role: "admin",
+      });
+    }
+  } catch {}
+}
+
+router.post("/admin/login", async (req, res) => {
+  try {
+    await ensureDefaultAdmin();
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: "أدخل اسم المستخدم وكلمة المرور" });
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username));
+    if (!user || user.isActive !== "true") return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+    if (user.passwordHash !== hashPassword(password)) return res.status(401).json({ error: "كلمة المرور غير صحيحة" });
+    const token = makeToken(user.id, user.role);
+    res.json({ token, user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role } });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
+
+router.get("/admin/me", adminAuth, async (req: any, res) => {
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.adminUser.userId));
+    if (!user) return res.status(404).json({ error: "المستخدم غير موجود" });
+    res.json({ id: user.id, username: user.username, fullName: user.fullName, role: user.role });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
+
+router.get("/admin/users", adminAuth, async (req, res) => {
+  try {
+    await ensureDefaultAdmin();
+    const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
+    res.json(users.map(u => ({ id: u.id, username: u.username, fullName: u.fullName, role: u.role, isActive: u.isActive, createdAt: u.createdAt.toISOString() })));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في جلب المستخدمين" });
+  }
+});
+
+router.post("/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const { username, password, fullName, role } = req.body;
+    if (!username || !password || !fullName) return res.status(400).json({ error: "جميع الحقول مطلوبة" });
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.username, username));
+    if (existing) return res.status(400).json({ error: "اسم المستخدم مستخدم بالفعل" });
+    const [user] = await db.insert(usersTable).values({
+      username, passwordHash: hashPassword(password), fullName, role: role || "viewer",
+    }).returning();
+    res.status(201).json({ id: user.id, username: user.username, fullName: user.fullName, role: user.role, isActive: user.isActive, createdAt: user.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في إضافة المستخدم" });
+  }
+});
+
+router.patch("/admin/users/:id", requireAdmin, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { fullName, role, isActive, password } = req.body;
+    const updates: any = {};
+    if (fullName !== undefined) updates.fullName = fullName;
+    if (role !== undefined) updates.role = role;
+    if (isActive !== undefined) updates.isActive = isActive;
+    if (password) updates.passwordHash = hashPassword(password);
+    const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
+    if (!user) return res.status(404).json({ error: "المستخدم غير موجود" });
+    res.json({ id: user.id, username: user.username, fullName: user.fullName, role: user.role, isActive: user.isActive, createdAt: user.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في تحديث المستخدم" });
+  }
+});
+
+router.delete("/admin/users/:id", requireAdmin, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (req.adminUser.userId === id) return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص" });
+    await db.delete(usersTable).where(eq(usersTable.id, id));
+    res.status(204).end();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في حذف المستخدم" });
+  }
+});
+
+export default router;

@@ -1,20 +1,23 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function RepCustody() {
+  const { can } = useAuth();
   const [filterRep, setFilterRep] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
   const emptyForm = { repId: "", date: new Date().toISOString().split("T")[0], type: "give", description: "", amount: 0, notes: "" };
   const [form, setForm] = useState(emptyForm);
 
@@ -33,6 +36,12 @@ export default function RepCustody() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["rep-custody"] }); queryClient.invalidateQueries({ queryKey: ["treasury"] }); setIsOpen(false); setForm(emptyForm); },
   });
 
+  const update = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      fetch(`${BASE}/api/rep-custody/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["rep-custody"] }); setEditItem(null); },
+  });
+
   const remove = useMutation({
     mutationFn: (id: number) => fetch(`${BASE}/api/rep-custody/${id}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rep-custody"] }),
@@ -45,36 +54,11 @@ export default function RepCustody() {
     <div className="space-y-5">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">عهدة المناديب</h1>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild><Button><Plus className="ml-2 w-4 h-4" /> إضافة عهدة</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>إضافة / استلام عهدة مندوب</DialogTitle></DialogHeader>
-            <form onSubmit={e => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">المندوب</label>
-                <Select value={form.repId} onValueChange={v => setForm({ ...form, repId: v })}>
-                  <SelectTrigger><SelectValue placeholder="اختر مندوباً" /></SelectTrigger>
-                  <SelectContent>{reps.map((r: any) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">النوع</label>
-                <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="give">تسليم عهدة (يُخصم من الخزينة)</SelectItem>
-                    <SelectItem value="receive">استلام عهدة</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><label className="text-sm font-medium">التاريخ</label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">البيان</label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">المبلغ</label><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
-              <Button type="submit" className="w-full" disabled={create.isPending}>حفظ</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {can("edit") && (
+          <Button onClick={() => { setForm(emptyForm); setIsOpen(true); }}>
+            <Plus className="ml-2 w-4 h-4" /> إضافة عهدة
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -111,7 +95,7 @@ export default function RepCustody() {
               <TableHead>النوع</TableHead>
               <TableHead>البيان</TableHead>
               <TableHead>المبلغ</TableHead>
-              <TableHead>إجراءات</TableHead>
+              {can("edit") && <TableHead>إجراءات</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -126,16 +110,70 @@ export default function RepCustody() {
                 <TableCell><Badge variant={r.type === "give" ? "destructive" : "default"}>{r.type === "give" ? "تسليم" : "استلام"}</Badge></TableCell>
                 <TableCell>{r.description}</TableCell>
                 <TableCell className="font-bold">{r.amount?.toLocaleString()} ر.س</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => confirm("حذف العهدة؟") && remove.mutate(r.id)}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </TableCell>
+                {can("edit") && (
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setEditItem({ ...r })}>
+                        <Edit className="w-4 h-4 text-blue-600" />
+                      </Button>
+                      {can("delete") && (
+                        <Button variant="ghost" size="icon" onClick={() => confirm("حذف العهدة؟") && remove.mutate(r.id)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>إضافة / استلام عهدة مندوب</DialogTitle></DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
+            <div className="space-y-2"><label className="text-sm font-medium">المندوب</label>
+              <Select value={form.repId} onValueChange={v => setForm({ ...form, repId: v })}>
+                <SelectTrigger><SelectValue placeholder="اختر مندوباً" /></SelectTrigger>
+                <SelectContent>{reps.map((r: any) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><label className="text-sm font-medium">النوع</label>
+              <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="give">تسليم عهدة (يُخصم من الخزينة)</SelectItem>
+                  <SelectItem value="receive">استلام عهدة</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><label className="text-sm font-medium">التاريخ</label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">البيان</label><Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} required /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">المبلغ</label><Input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} required /></div>
+            <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+            <Button type="submit" className="w-full" disabled={create.isPending}>حفظ</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editItem} onOpenChange={v => !v && setEditItem(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>تعديل العهدة</DialogTitle></DialogHeader>
+          {editItem && (
+            <form onSubmit={e => { e.preventDefault(); update.mutate({ id: editItem.id, data: { date: editItem.date, description: editItem.description, amount: Number(editItem.amount), notes: editItem.notes } }); }} className="space-y-4">
+              <div className="space-y-2"><label className="text-sm font-medium">التاريخ</label><Input type="date" value={editItem.date} onChange={e => setEditItem({ ...editItem, date: e.target.value })} required /></div>
+              <div className="space-y-2"><label className="text-sm font-medium">البيان</label><Input value={editItem.description} onChange={e => setEditItem({ ...editItem, description: e.target.value })} required /></div>
+              <div className="space-y-2"><label className="text-sm font-medium">المبلغ</label><Input type="number" min="0" step="0.01" value={editItem.amount} onChange={e => setEditItem({ ...editItem, amount: Number(e.target.value) })} required /></div>
+              <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={editItem.notes || ""} onChange={e => setEditItem({ ...editItem, notes: e.target.value })} /></div>
+              <Button type="submit" className="w-full" disabled={update.isPending}>حفظ التغييرات</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

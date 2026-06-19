@@ -43,7 +43,6 @@ router.get("/inventory/transactions", async (req, res) => {
   }
 });
 
-// Manual voucher (receipt = in, issue = out)
 router.post("/inventory/vouchers", async (req, res) => {
   try {
     const { date, type, productId, quantity, reference, notes } = req.body;
@@ -76,6 +75,31 @@ router.post("/inventory/vouchers", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "فشل في إضافة سند المخزن" });
+  }
+});
+
+router.delete("/inventory/transactions/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [txn] = await db.select().from(inventoryTransactionsTable).where(eq(inventoryTransactionsTable.id, id));
+    if (!txn) return res.status(404).json({ error: "السند غير موجود" });
+
+    if (txn.referenceType === "voucher") {
+      const [existing] = await db.select().from(inventoryTable).where(eq(inventoryTable.productId, txn.productId));
+      if (existing) {
+        if (txn.type === "in") {
+          await db.update(inventoryTable).set({ quantity: Math.max(0, existing.quantity - txn.quantity) }).where(eq(inventoryTable.productId, txn.productId));
+        } else {
+          await db.update(inventoryTable).set({ quantity: existing.quantity + txn.quantity }).where(eq(inventoryTable.productId, txn.productId));
+        }
+      }
+    }
+
+    await db.delete(inventoryTransactionsTable).where(eq(inventoryTransactionsTable.id, id));
+    res.status(204).end();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في حذف السند" });
   }
 });
 

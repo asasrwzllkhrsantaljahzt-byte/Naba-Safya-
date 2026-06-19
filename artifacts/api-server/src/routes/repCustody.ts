@@ -35,7 +35,6 @@ router.post("/rep-custody", async (req, res) => {
     const [record] = await db.insert(repCustodyTable).values({
       repId, repName: rep.name, date, type, description, amount: String(amount), notes,
     }).returning();
-    // If giving custody, deduct from treasury
     if (type === "give") {
       await db.insert(treasuryTransactionsTable).values({
         date, type: "out", amount: String(amount),
@@ -46,6 +45,22 @@ router.post("/rep-custody", async (req, res) => {
     }
     res.status(201).json(fmt(record));
   } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في إضافة العهدة" }); }
+});
+
+router.patch("/rep-custody/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { date, type, description, amount, notes } = req.body;
+    const updates: any = {};
+    if (date !== undefined) updates.date = date;
+    if (type !== undefined) updates.type = type;
+    if (description !== undefined) updates.description = description;
+    if (amount !== undefined) updates.amount = String(amount);
+    if (notes !== undefined) updates.notes = notes;
+    const [record] = await db.update(repCustodyTable).set(updates).where(eq(repCustodyTable.id, id)).returning();
+    if (!record) return res.status(404).json({ error: "العهدة غير موجودة" });
+    res.json(fmt(record));
+  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في تحديث العهدة" }); }
 });
 
 router.delete("/rep-custody/:id", async (req, res) => {

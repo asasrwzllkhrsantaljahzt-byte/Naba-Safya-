@@ -3,8 +3,10 @@ import { Link, useLocation } from "wouter";
 import {
   Droplets, LayoutDashboard, ShoppingCart, Truck, Package,
   Receipt, Wallet, BarChart3, ChevronDown, ChevronLeft,
-  UserCog, UsersRound, Calculator, Settings
+  UserCog, UsersRound, Calculator, Settings, ShieldCheck, LogIn, LogOut
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 
 type SubItem = { name: string; href: string };
 type NavItem = { name: string; icon: React.ElementType; href?: string; sub?: SubItem[] };
@@ -72,8 +74,11 @@ const nav: NavItem[] = [
   { name: "الإعدادات", icon: Settings, href: "/settings" },
 ];
 
+const roleLabelMap: Record<string, string> = { admin: "مشرف", manager: "مدير", viewer: "مشاهد" };
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const { user, logout, can } = useAuth();
 
   const hasActiveSub = (item: NavItem) => item.sub?.some(s => s.href === location) ?? false;
 
@@ -90,6 +95,7 @@ export function Layout({ children }: { children: ReactNode }) {
       if (item.href && location === item.href) return item.name;
       if (item.sub) { const s = item.sub.find(x => x.href === location); if (s) return s.name; }
     }
+    if (location === "/users") return "إدارة المستخدمين";
     return "النظام";
   };
 
@@ -142,10 +148,39 @@ export function Layout({ children }: { children: ReactNode }) {
               </div>
             );
           })}
+
+          {can("manageUsers") && (
+            <Link href="/users">
+              <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${location === "/users" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <span className="text-sm font-medium">إدارة المستخدمين</span>
+              </div>
+            </Link>
+          )}
         </nav>
-        <div className="p-2 border-t">
+
+        <div className="p-2 border-t space-y-1">
+          {user ? (
+            <>
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                <div className="font-medium text-foreground truncate">{user.fullName}</div>
+                <Badge variant="secondary" className="text-xs mt-0.5">{roleLabelMap[user.role] || user.role}</Badge>
+              </div>
+              <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-red-600 hover:bg-red-50 cursor-pointer">
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span>تسجيل الخروج</span>
+              </button>
+            </>
+          ) : (
+            <Link href="/login">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-blue-600 hover:bg-blue-50 cursor-pointer">
+                <LogIn className="w-4 h-4 shrink-0" />
+                <span>تسجيل الدخول</span>
+              </div>
+            </Link>
+          )}
           <a href="/rep-login" target="_blank" rel="noopener noreferrer">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-blue-600 hover:bg-blue-50 cursor-pointer">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted cursor-pointer">
               <UsersRound className="w-4 h-4 shrink-0" />
               <span>بوابة المندوبين</span>
             </div>
