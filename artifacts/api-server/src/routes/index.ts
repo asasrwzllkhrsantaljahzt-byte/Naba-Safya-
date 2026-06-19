@@ -1,8 +1,46 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import productsRouter from "./products";
+import customersRouter from "./customers";
+import repsRouter from "./reps";
+import purchasesRouter from "./purchases";
+import salesRouter from "./sales";
+import inventoryRouter from "./inventory";
+import expensesRouter from "./expenses";
+import treasuryRouter from "./treasury";
+import reportsRouter from "./reports";
+import suppliersRouter from "./suppliers";
+import employeesRouter from "./employees";
+import attendanceRouter from "./attendance";
+import payrollRouter from "./payroll";
+import costCentersRouter from "./costCenters";
+import repCustodyRouter from "./repCustody";
+import obligationsRouter from "./obligations";
+import authRouter from "./auth";
+import repPortalRouter from "./repPortal";
+import operationalCostsRouter from "./operationalCosts";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
+router.use(repPortalRouter);
+router.use(operationalCostsRouter);
+router.use(productsRouter);
+router.use(customersRouter);
+router.use(repsRouter);
+router.use(purchasesRouter);
+router.use(salesRouter);
+router.use(inventoryRouter);
+router.use(expensesRouter);
+router.use(treasuryRouter);
+router.use(reportsRouter);
+router.use(suppliersRouter);
+router.use(employeesRouter);
+router.use(attendanceRouter);
+router.use(payrollRouter);
+router.use(costCentersRouter);
+router.use(repCustodyRouter);
+router.use(obligationsRouter);
 
 export default router;

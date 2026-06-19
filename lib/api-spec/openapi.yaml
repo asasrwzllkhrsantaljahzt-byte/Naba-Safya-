@@ -3,20 +3,38 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: مصنع نبع صافيا - نظام إدارة المخزن والمبيعات
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: products
+    description: المنتجات
+  - name: customers
+    description: العملاء
+  - name: reps
+    description: المندوبين
+  - name: purchases
+    description: فواتير الشراء
+  - name: sales
+    description: طلبيات البيع
+  - name: inventory
+    description: المخزن
+  - name: expenses
+    description: المصروفات
+  - name: treasury
+    description: الخزينة
+  - name: reports
+    description: التقارير
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +42,820 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ===================== PRODUCTS =====================
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: قائمة المنتجات
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: إضافة منتج
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    patch:
+      operationId: updateProduct
+      tags: [products]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  # ===================== CUSTOMERS =====================
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: قائمة العملاء
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: إضافة عميل
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+    patch:
+      operationId: updateCustomer
+      tags: [customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+    delete:
+      operationId: deleteCustomer
+      tags: [customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /customers/{id}/coupon-books:
+    get:
+      operationId: listCustomerCouponBooks
+      tags: [customers]
+      summary: دفاتر كوبونات العميل
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CouponBook"
+    post:
+      operationId: createCouponBook
+      tags: [customers]
+      summary: إضافة دفتر كوبونات للعميل
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponBookInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponBook"
+
+  # ===================== REPS =====================
+  /reps:
+    get:
+      operationId: listReps
+      tags: [reps]
+      summary: قائمة المندوبين
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rep"
+    post:
+      operationId: createRep
+      tags: [reps]
+      summary: إضافة مندوب
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rep"
+
+  /reps/{id}:
+    get:
+      operationId: getRep
+      tags: [reps]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rep"
+    patch:
+      operationId: updateRep
+      tags: [reps]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rep"
+    delete:
+      operationId: deleteRep
+      tags: [reps]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ===================== PURCHASES =====================
+  /purchases:
+    get:
+      operationId: listPurchases
+      tags: [purchases]
+      summary: قائمة فواتير الشراء
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Purchase"
+    post:
+      operationId: createPurchase
+      tags: [purchases]
+      summary: إضافة فاتورة شراء (تضيف للمخزن تلقائياً)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Purchase"
+
+  /purchases/{id}:
+    get:
+      operationId: getPurchase
+      tags: [purchases]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Purchase"
+    delete:
+      operationId: deletePurchase
+      tags: [purchases]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ===================== SALES =====================
+  /sales:
+    get:
+      operationId: listSales
+      tags: [sales]
+      summary: قائمة طلبيات البيع
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: repId
+          in: query
+          schema:
+            type: integer
+        - name: customerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sale"
+    post:
+      operationId: createSale
+      tags: [sales]
+      summary: إضافة طلبية بيع (تخصم من المخزن تلقائياً)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+
+  /sales/{id}:
+    get:
+      operationId: getSale
+      tags: [sales]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+    delete:
+      operationId: deleteSale
+      tags: [sales]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ===================== INVENTORY =====================
+  /inventory:
+    get:
+      operationId: getInventory
+      tags: [inventory]
+      summary: رصيد المخزن الحالي
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryStatus"
+
+  /inventory/transactions:
+    get:
+      operationId: listInventoryTransactions
+      tags: [inventory]
+      summary: حركات المخزن
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [in, out]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryTransaction"
+
+  # ===================== EXPENSES =====================
+  /expenses:
+    get:
+      operationId: listExpenses
+      tags: [expenses]
+      summary: قائمة المصروفات
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+    post:
+      operationId: createExpense
+      tags: [expenses]
+      summary: إضافة مصروف
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+
+  /expenses/{id}:
+    get:
+      operationId: getExpense
+      tags: [expenses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    patch:
+      operationId: updateExpense
+      tags: [expenses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    delete:
+      operationId: deleteExpense
+      tags: [expenses]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /expense-categories:
+    get:
+      operationId: listExpenseCategories
+      tags: [expenses]
+      summary: فئات المصروفات
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  # ===================== TREASURY =====================
+  /treasury:
+    get:
+      operationId: getTreasury
+      tags: [treasury]
+      summary: رصيد الخزينة الحالي
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreasuryBalance"
+
+  /treasury/transactions:
+    get:
+      operationId: listTreasuryTransactions
+      tags: [treasury]
+      summary: حركات الخزينة
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [in, out]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TreasuryTransaction"
+    post:
+      operationId: createTreasuryTransaction
+      tags: [treasury]
+      summary: إضافة حركة للخزينة
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TreasuryTransactionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreasuryTransaction"
+
+  # ===================== REPORTS =====================
+  /reports/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [reports]
+      summary: لوحة المتابعة - ملخص شامل
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardData"
+
+  /reports/income-statement:
+    get:
+      operationId: getIncomeStatement
+      tags: [reports]
+      summary: قائمة الدخل (الأرباح والخسائر)
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncomeStatement"
+
+  /reports/balance-sheet:
+    get:
+      operationId: getBalanceSheet
+      tags: [reports]
+      summary: الميزانية العمومية
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSheet"
+
+  /reports/rep-sales:
+    get:
+      operationId: getRepSalesReport
+      tags: [reports]
+      summary: مبيعات المندوبين
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RepSalesSummary"
+
+  /reports/rep-collections:
+    get:
+      operationId: getRepCollectionsReport
+      tags: [reports]
+      summary: تحصيلات المندوبين
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RepCollectionsSummary"
+
+  /reports/vat:
+    get:
+      operationId: getVatReport
+      tags: [reports]
+      summary: تقرير ضريبة القيمة المضافة
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VatReport"
+
+  /reports/monthly-sales:
+    get:
+      operationId: getMonthlySalesChart
+      tags: [reports]
+      summary: مبيعات شهرية للرسم البياني
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyChartPoint"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +866,694 @@ components:
       required:
         - status
 
+    # ---- PRODUCT ----
+    Product:
+      type: object
+      required: [id, name, color, unitPrice, vatRate]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          enum: [white, blue]
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        description:
+          type: ["string", "null"]
+
+    ProductInput:
+      type: object
+      required: [name, color, unitPrice, vatRate]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+          enum: [white, blue]
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        description:
+          type: string
+
+    ProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        description:
+          type: string
+
+    # ---- CUSTOMER ----
+    Customer:
+      type: object
+      required: [id, name, phone, area, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: ["string", "null"]
+        area:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        totalCouponBooks:
+          type: integer
+        remainingCoupons:
+          type: number
+
+    CustomerInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        notes:
+          type: string
+
+    CustomerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        notes:
+          type: string
+
+    # ---- COUPON BOOK ----
+    CouponBook:
+      type: object
+      required: [id, customerId, totalValue, remainingValue, bookNumber, issuedAt]
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        bookNumber:
+          type: string
+        totalValue:
+          type: number
+        remainingValue:
+          type: number
+        issuedAt:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    CouponBookInput:
+      type: object
+      required: [totalValue, bookNumber]
+      properties:
+        bookNumber:
+          type: string
+        totalValue:
+          type: number
+        notes:
+          type: string
+
+    # ---- REP ----
+    Rep:
+      type: object
+      required: [id, name, phone, area, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: ["string", "null"]
+        area:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        totalSales:
+          type: number
+        totalCollections:
+          type: number
+
+    RepInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+
+    RepUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        isActive:
+          type: boolean
+
+    # ---- PURCHASE ----
+    Purchase:
+      type: object
+      required: [id, invoiceNumber, date, supplierName, items, totalAmount, vatAmount, grandTotal, createdAt]
+      properties:
+        id:
+          type: integer
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        supplierName:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseItem"
+        totalAmount:
+          type: number
+        vatAmount:
+          type: number
+        grandTotal:
+          type: number
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PurchaseItem:
+      type: object
+      required: [productId, productName, quantity, unitPrice, vatRate, subtotal]
+      properties:
+        productId:
+          type: integer
+        productName:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        subtotal:
+          type: number
+
+    PurchaseInput:
+      type: object
+      required: [date, items]
+      properties:
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        supplierName:
+          type: string
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseItemInput"
+
+    PurchaseItemInput:
+      type: object
+      required: [productId, quantity, unitPrice]
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+
+    # ---- SALE ----
+    Sale:
+      type: object
+      required: [id, orderNumber, date, customerId, customerName, repId, repName, items, totalAmount, vatAmount, grandTotal, paymentMethod, createdAt]
+      properties:
+        id:
+          type: integer
+        orderNumber:
+          type: string
+        date:
+          type: string
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        repId:
+          type: integer
+        repName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaleItem"
+        totalAmount:
+          type: number
+        vatAmount:
+          type: number
+        grandTotal:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [coupon, cash, network]
+        couponBookId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SaleItem:
+      type: object
+      required: [productId, productName, quantity, unitPrice, vatRate, subtotal]
+      properties:
+        productId:
+          type: integer
+        productName:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+        subtotal:
+          type: number
+
+    SaleInput:
+      type: object
+      required: [date, customerId, repId, items, paymentMethod]
+      properties:
+        orderNumber:
+          type: string
+        date:
+          type: string
+        customerId:
+          type: integer
+        repId:
+          type: integer
+        paymentMethod:
+          type: string
+          enum: [coupon, cash, network]
+        couponBookId:
+          type: integer
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaleItemInput"
+
+    SaleItemInput:
+      type: object
+      required: [productId, quantity, unitPrice]
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        vatRate:
+          type: number
+
+    # ---- INVENTORY ----
+    InventoryStatus:
+      type: object
+      required: [items, lastUpdated]
+      properties:
+        lastUpdated:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryItem"
+
+    InventoryItem:
+      type: object
+      required: [productId, productName, color, quantity]
+      properties:
+        productId:
+          type: integer
+        productName:
+          type: string
+        color:
+          type: string
+        quantity:
+          type: integer
+
+    InventoryTransaction:
+      type: object
+      required: [id, date, type, productId, productName, quantity, reference, referenceType, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        type:
+          type: string
+          enum: [in, out]
+        productId:
+          type: integer
+        productName:
+          type: string
+        quantity:
+          type: integer
+        reference:
+          type: string
+        referenceType:
+          type: string
+          enum: [purchase, sale]
+        createdAt:
+          type: string
+
+    # ---- EXPENSE ----
+    Expense:
+      type: object
+      required: [id, date, category, description, amount, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ExpenseInput:
+      type: object
+      required: [date, category, description, amount]
+      properties:
+        date:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        notes:
+          type: string
+
+    ExpenseUpdate:
+      type: object
+      properties:
+        date:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        notes:
+          type: string
+
+    # ---- TREASURY ----
+    TreasuryBalance:
+      type: object
+      required: [balance, totalIn, totalOut]
+      properties:
+        balance:
+          type: number
+        totalIn:
+          type: number
+        totalOut:
+          type: number
+
+    TreasuryTransaction:
+      type: object
+      required: [id, date, type, amount, description, source, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+        type:
+          type: string
+          enum: [in, out]
+        amount:
+          type: number
+        description:
+          type: string
+        source:
+          type: string
+          enum: [sale, expense, purchase, manual]
+        reference:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    TreasuryTransactionInput:
+      type: object
+      required: [date, type, amount, description]
+      properties:
+        date:
+          type: string
+        type:
+          type: string
+          enum: [in, out]
+        amount:
+          type: number
+        description:
+          type: string
+        notes:
+          type: string
+
+    # ---- REPORTS ----
+    DashboardData:
+      type: object
+      required: [totalSalesAmount, totalPurchasesAmount, totalExpenses, netProfit, cashBalance, totalCustomers, totalReps, inventoryItems, recentSales, recentPurchases, monthlySales, topReps]
+      properties:
+        totalSalesAmount:
+          type: number
+        totalPurchasesAmount:
+          type: number
+        totalExpenses:
+          type: number
+        netProfit:
+          type: number
+        cashBalance:
+          type: number
+        totalCustomers:
+          type: integer
+        totalReps:
+          type: integer
+        inventoryItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryItem"
+        recentSales:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sale"
+        recentPurchases:
+          type: array
+          items:
+            $ref: "#/components/schemas/Purchase"
+        monthlySales:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyChartPoint"
+        topReps:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepSalesSummary"
+
+    MonthlyChartPoint:
+      type: object
+      required: [month, year, label, salesAmount, purchasesAmount, expenses, profit]
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+        label:
+          type: string
+        salesAmount:
+          type: number
+        purchasesAmount:
+          type: number
+        expenses:
+          type: number
+        profit:
+          type: number
+
+    IncomeStatement:
+      type: object
+      required: [from, to, totalRevenue, totalCost, grossProfit, totalExpenses, netProfit, vatCollected, vatPaid, vatBalance, revenueBreakdown, expenseBreakdown]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        totalRevenue:
+          type: number
+        totalCost:
+          type: number
+        grossProfit:
+          type: number
+        totalExpenses:
+          type: number
+        netProfit:
+          type: number
+        vatCollected:
+          type: number
+        vatPaid:
+          type: number
+        vatBalance:
+          type: number
+        revenueBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakdownItem"
+        expenseBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakdownItem"
+
+    BalanceSheet:
+      type: object
+      required: [date, totalAssets, totalLiabilities, equity, assets, liabilities]
+      properties:
+        date:
+          type: string
+        totalAssets:
+          type: number
+        totalLiabilities:
+          type: number
+        equity:
+          type: number
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakdownItem"
+        liabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/BreakdownItem"
+
+    BreakdownItem:
+      type: object
+      required: [label, amount]
+      properties:
+        label:
+          type: string
+        amount:
+          type: number
+
+    RepSalesSummary:
+      type: object
+      required: [repId, repName, area, totalOrders, totalAmount, totalVat, grandTotal]
+      properties:
+        repId:
+          type: integer
+        repName:
+          type: string
+        area:
+          type: ["string", "null"]
+        totalOrders:
+          type: integer
+        totalAmount:
+          type: number
+        totalVat:
+          type: number
+        grandTotal:
+          type: number
+
+    RepCollectionsSummary:
+      type: object
+      required: [repId, repName, area, cashCollected, couponCollected, networkCollected, total]
+      properties:
+        repId:
+          type: integer
+        repName:
+          type: string
+        area:
+          type: ["string", "null"]
+        cashCollected:
+          type: number
+        couponCollected:
+          type: number
+        networkCollected:
+          type: number
+        total:
+          type: number
+
+    VatReport:
+      type: object
+      required: [from, to, companyName, vatNumber, salesVat, purchasesVat, netVat, salesDetails, purchasesDetails]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        companyName:
+          type: string
+        vatNumber:
+          type: string
+        salesVat:
+          type: number
+        purchasesVat:
+          type: number
+        netVat:
+          type: number
+        salesDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/VatDetail"
+        purchasesDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/VatDetail"
+
+    VatDetail:
+      type: object
+      required: [date, reference, description, baseAmount, vatAmount, total]
+      properties:
+        date:
+          type: string
+        reference:
+          type: string
+        description:
+          type: string
+        baseAmount:
+          type: number
+        vatAmount:
+          type: number
+        total:
+          type: number
