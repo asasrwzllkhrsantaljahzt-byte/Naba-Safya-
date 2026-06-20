@@ -4,7 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, CreditCard, Download, Database, CheckCircle } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Building2, CreditCard, Download, Database, CheckCircle, Package, Plus, Pencil, Trash2, Droplet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -24,6 +27,15 @@ type FactorySettings = {
   logoUrl: string;
 };
 
+type Product = {
+  id: number;
+  name: string;
+  color: string;
+  unitPrice: number;
+  vatRate: number;
+  description?: string | null;
+};
+
 const defaultSettings: Omit<FactorySettings, "id"> = {
   companyName: "",
   vatNumber: "",
@@ -38,6 +50,8 @@ const defaultSettings: Omit<FactorySettings, "id"> = {
   logoUrl: "",
 };
 
+const emptyProduct = { name: "", color: "blue", unitPrice: "", vatRate: "15", description: "" };
+
 export default function Settings() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Omit<FactorySettings, "id">>(defaultSettings);
@@ -45,8 +59,15 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
 
+  // Products state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productDialog, setProductDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState(emptyProduct);
+
   useEffect(() => {
-    fetch(`/api/settings`)
+    fetch(`${API}/api/settings`)
       .then((r) => r.json())
       .then((data) => {
         setSettings({
@@ -63,16 +84,25 @@ export default function Settings() {
           logoUrl: data.logoUrl ?? "",
         });
       })
-      .catch(() => {
-        toast({ title: "خطأ", description: "فشل في جلب الإعدادات", variant: "destructive" });
-      })
+      .catch(() => toast({ title: "خطأ", description: "فشل في جلب الإعدادات", variant: "destructive" }))
       .finally(() => setIsLoading(false));
+
+    loadProducts();
   }, []);
+
+  const loadProducts = () => {
+    setProductsLoading(true);
+    fetch(`${API}/api/products`)
+      .then(r => r.json())
+      .then(setProducts)
+      .catch(() => toast({ title: "خطأ", description: "فشل في جلب المنتجات", variant: "destructive" }))
+      .finally(() => setProductsLoading(false));
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/settings`, {
+      const res = await fetch(`${API}/api/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
@@ -89,7 +119,7 @@ export default function Settings() {
   const handleBackup = async () => {
     setIsBackingUp(true);
     try {
-      const res = await fetch(`/api/backup`);
+      const res = await fetch(`${API}/api/backup`);
       if (!res.ok) throw new Error();
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -103,6 +133,67 @@ export default function Settings() {
       toast({ title: "خطأ", description: "فشل في إنشاء النسخة الاحتياطية", variant: "destructive" });
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  const openAddProduct = () => {
+    setEditingProduct(null);
+    setProductForm(emptyProduct);
+    setProductDialog(true);
+  };
+
+  const openEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    setProductForm({ name: p.name, color: p.color, unitPrice: String(p.unitPrice), vatRate: String(p.vatRate), description: p.description ?? "" });
+    setProductDialog(true);
+  };
+
+  const handleSaveProduct = async () => {
+    if (!productForm.name.trim()) return toast({ title: "خطأ", description: "اسم المنتج مطلوب", variant: "destructive" });
+    if (!productForm.unitPrice) return toast({ title: "خطأ", description: "السعر مطلوب", variant: "destructive" });
+
+    const body = {
+      name: productForm.name,
+      color: productForm.color,
+      unitPrice: parseFloat(productForm.unitPrice),
+      vatRate: parseFloat(productForm.vatRate),
+      description: productForm.description || null,
+    };
+
+    try {
+      if (editingProduct) {
+        const res = await fetch(`${API}/api/products/${editingProduct.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error();
+        toast({ title: "تم التعديل", description: "تم تعديل المنتج بنجاح" });
+      } else {
+        const res = await fetch(`${API}/api/products`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error();
+        toast({ title: "تمت الإضافة", description: "تم إضافة المنتج بنجاح" });
+      }
+      setProductDialog(false);
+      loadProducts();
+    } catch {
+      toast({ title: "خطأ", description: "فشل في حفظ المنتج", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+    try {
+      const res = await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast({ title: "تم الحذف", description: "تم حذف المنتج بنجاح" });
+      loadProducts();
+    } catch {
+      toast({ title: "خطأ", description: "فشل في حذف المنتج", variant: "destructive" });
     }
   };
 
@@ -121,8 +212,15 @@ export default function Settings() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <Tabs defaultValue="factory">
-        <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent mb-6">
+      <Tabs defaultValue="products">
+        <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent mb-6 flex-wrap">
+          <TabsTrigger
+            value="products"
+            className="data-[state=active]:border-primary data-[state=active]:bg-transparent border-b-2 border-transparent rounded-none px-6 py-3"
+          >
+            <Package className="w-4 h-4 ml-2" />
+            المنتجات
+          </TabsTrigger>
           <TabsTrigger
             value="factory"
             className="data-[state=active]:border-primary data-[state=active]:bg-transparent border-b-2 border-transparent rounded-none px-6 py-3"
@@ -146,6 +244,145 @@ export default function Settings() {
           </TabsTrigger>
         </TabsList>
 
+        {/* ===== PRODUCTS TAB ===== */}
+        <TabsContent value="products" className="mt-0">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>إدارة المنتجات</CardTitle>
+                <CardDescription>أنواع القوارير التي تظهر في فواتير البيع والشراء</CardDescription>
+              </div>
+              <Button onClick={openAddProduct}>
+                <Plus className="ml-2 w-4 h-4" /> إضافة منتج
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {productsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">جاري التحميل...</div>
+              ) : products.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-lg font-medium">لا يوجد منتجات بعد</p>
+                  <p className="text-sm mt-1">أضف أنواع القوارير لتظهر في فواتير البيع والشراء</p>
+                  <Button className="mt-4" onClick={openAddProduct}><Plus className="ml-2 w-4 h-4" />إضافة أول منتج</Button>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>اسم المنتج</TableHead>
+                        <TableHead>اللون</TableHead>
+                        <TableHead>سعر الوحدة</TableHead>
+                        <TableHead>نسبة الضريبة</TableHead>
+                        <TableHead>الوصف</TableHead>
+                        <TableHead>إجراءات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {products.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${p.color === "blue" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}>
+                              <Droplet className="w-3 h-3" />
+                              {p.color === "blue" ? "زرقاء" : "بيضاء"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-bold">{p.unitPrice.toFixed(2)} ر.س</TableCell>
+                          <TableCell>{p.vatRate}%</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{p.description ?? "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openEditProduct(p)}>
+                                <Pencil className="w-4 h-4 text-blue-600" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(p.id)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800">
+                <strong>ملاحظة:</strong> القوارير الزرقاء تظهر في فواتير البيع، والقوارير البيضاء تستخدم في المشتريات وحركات المخزن.
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Product Dialog */}
+          <Dialog open={productDialog} onOpenChange={setProductDialog}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingProduct ? "تعديل المنتج" : "إضافة منتج جديد"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">اسم المنتج</label>
+                  <Input
+                    placeholder="مثال: عبوة 18.9 لتر"
+                    value={productForm.name}
+                    onChange={e => setProductForm({ ...productForm, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">اللون</label>
+                  <Select value={productForm.color} onValueChange={v => setProductForm({ ...productForm, color: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="blue">🔵 زرقاء (تظهر في فواتير البيع)</SelectItem>
+                      <SelectItem value="white">⚪ بيضاء (مشتريات ومخزن)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">سعر الوحدة (ر.س)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={productForm.unitPrice}
+                      onChange={e => setProductForm({ ...productForm, unitPrice: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">نسبة الضريبة (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="15"
+                      value={productForm.vatRate}
+                      onChange={e => setProductForm({ ...productForm, vatRate: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">وصف (اختياري)</label>
+                  <Input
+                    placeholder="وصف إضافي..."
+                    value={productForm.description}
+                    onChange={e => setProductForm({ ...productForm, description: e.target.value })}
+                  />
+                </div>
+                <Button className="w-full" onClick={handleSaveProduct}>
+                  {editingProduct ? "حفظ التعديلات" : "إضافة المنتج"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        {/* ===== FACTORY TAB ===== */}
         <TabsContent value="factory" className="mt-0">
           <Card>
             <CardHeader>
@@ -188,6 +425,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
+        {/* ===== FINANCIAL TAB ===== */}
         <TabsContent value="financial" className="mt-0">
           <Card>
             <CardHeader>
@@ -210,6 +448,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
+        {/* ===== BACKUP TAB ===== */}
         <TabsContent value="backup" className="mt-0">
           <Card>
             <CardHeader>

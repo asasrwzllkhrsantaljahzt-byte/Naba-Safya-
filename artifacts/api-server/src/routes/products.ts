@@ -64,4 +64,16 @@ router.patch("/products/:id", async (req, res) => {
   }
 });
 
+router.delete("/products/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [deleted] = await db.delete(productsTable).where(eq(productsTable.id, id)).returning();
+    if (!deleted) return res.status(404).json({ error: "المنتج غير موجود" });
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "فشل في حذف المنتج" });
+  }
+});
+
 export default router;

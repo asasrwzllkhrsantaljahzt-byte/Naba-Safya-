@@ -7,17 +7,131 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, Printer } from "lucide-react";
 import { queryClient } from "@/lib/utils";
-import { format } from "date-fns";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const COMPANY_NAME = "مصنع نبع صافيا لتعبئة المياه";
+const VAT_NUMBER = "314668535600003";
 
 const paymentLabels: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
   cash: { label: "نقدي", variant: "default" },
   network: { label: "شبكة", variant: "secondary" },
   credit: { label: "آجل", variant: "outline" },
 };
+
+function printPurchaseInvoice(purchase: any) {
+  const items = Array.isArray(purchase.items) ? purchase.items : [];
+  const w = window.open("", "_blank", "width=800,height=700");
+  if (!w) return;
+
+  const itemsHtml = items.map((item: any) => `
+    <tr>
+      <td>${item.productName ?? ""}</td>
+      <td style="text-align:center">${item.quantity ?? 0}</td>
+      <td style="text-align:center">${Number(item.unitPrice ?? 0).toFixed(2)}</td>
+      <td style="text-align:center">${Number(item.vatRate ?? 0) * 100}%</td>
+      <td style="text-align:left">${Number(item.subtotal ?? 0).toFixed(2)}</td>
+    </tr>
+  `).join("");
+
+  const grandTotal = Number(purchase.grandTotal ?? 0).toFixed(2);
+  const totalAmount = Number(purchase.totalAmount ?? 0).toFixed(2);
+  const vatAmount = Number(purchase.vatAmount ?? 0).toFixed(2);
+  const payLabel = paymentLabels[purchase.paymentMethod]?.label ?? purchase.paymentMethod ?? "نقدي";
+
+  w.document.write(`
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="UTF-8"/>
+      <title>فاتورة شراء ${purchase.invoiceNumber ?? ""}</title>
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; padding: 32px; color: #111; font-size: 14px; max-width: 800px; margin: auto; }
+        .header { text-align: center; border-bottom: 2px solid #16a34a; padding-bottom: 16px; margin-bottom: 20px; }
+        .header h1 { font-size: 22px; margin: 0 0 4px 0; color: #16a34a; }
+        .header p { margin: 2px 0; color: #555; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .info-box { border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; }
+        .info-box label { font-size: 11px; color: #888; display: block; margin-bottom: 3px; }
+        .info-box span { font-weight: bold; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        th { background: #16a34a; color: white; padding: 10px 12px; font-size: 13px; }
+        td { padding: 9px 12px; border-bottom: 1px solid #e5e7eb; }
+        tr:last-child td { border-bottom: none; }
+        .totals { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; background: #f8fafc; }
+        .total-row { display: flex; justify-content: space-between; padding: 6px 0; }
+        .total-row.grand { border-top: 2px solid #16a34a; margin-top: 8px; padding-top: 12px; font-size: 18px; color: #16a34a; font-weight: bold; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #dcfce7; color: #16a34a; }
+        .footer { margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; color: #888; font-size: 12px; }
+        @media print { body { padding: 16px; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>${COMPANY_NAME}</h1>
+        <p>الرقم الضريبي: ${VAT_NUMBER}</p>
+        <p style="font-size:18px; font-weight:bold; margin-top:10px;">فاتورة شراء</p>
+        ${purchase.invoiceNumber ? `<p style="font-size:13px; color:#16a34a;">رقم الفاتورة: ${purchase.invoiceNumber}</p>` : ""}
+      </div>
+
+      <div class="info-grid">
+        <div class="info-box">
+          <label>المورد</label>
+          <span>${purchase.supplierName ?? "-"}</span>
+        </div>
+        <div class="info-box">
+          <label>التاريخ</label>
+          <span>${purchase.date ?? ""}</span>
+        </div>
+        <div class="info-box">
+          <label>طريقة الدفع</label>
+          <span class="badge">${payLabel}</span>
+        </div>
+        ${purchase.notes ? `<div class="info-box">
+          <label>ملاحظات</label>
+          <span>${purchase.notes}</span>
+        </div>` : ""}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>المنتج</th>
+            <th style="text-align:center">الكمية</th>
+            <th style="text-align:center">سعر الوحدة</th>
+            <th style="text-align:center">نسبة الضريبة</th>
+            <th style="text-align:left">الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+
+      <div class="totals">
+        <div class="total-row">
+          <span>المبلغ قبل الضريبة</span>
+          <span>${totalAmount} ر.س</span>
+        </div>
+        <div class="total-row">
+          <span>ضريبة القيمة المضافة (15%)</span>
+          <span>${vatAmount} ر.س</span>
+        </div>
+        <div class="total-row grand">
+          <span>الإجمالي شامل الضريبة</span>
+          <span>${grandTotal} ر.س</span>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>فاتورة شراء صادرة عن ${COMPANY_NAME}</p>
+      </div>
+    </body>
+    </html>
+  `);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 400);
+}
 
 export default function Purchases() {
   const [from, setFrom] = useState("");
@@ -108,7 +222,7 @@ export default function Purchases() {
                     <SelectTrigger><SelectValue placeholder="اختر مورداً" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_all">بدون تحديد</SelectItem>
-                      {suppliers.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                      {(suppliers as any[]).map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -128,13 +242,19 @@ export default function Purchases() {
 
               <div className="space-y-3">
                 <h3 className="font-semibold">المنتجات</h3>
-                <div className="flex gap-2">
-                  {products.map(p => (
-                    <Button key={p.id} type="button" variant="outline" size="sm" onClick={() => handleAddItem(p.id)}>
-                      + {p.name}
-                    </Button>
-                  ))}
-                </div>
+                {products.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground border rounded-lg">
+                    لا توجد منتجات — أضف منتجات من صفحة <strong>الإعدادات &gt; المنتجات</strong> أولاً
+                  </div>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    {products.map(p => (
+                      <Button key={p.id} type="button" variant="outline" size="sm" onClick={() => handleAddItem(p.id)}>
+                        + {p.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
                 {items.length > 0 && (
                   <div className="border rounded-lg p-4 space-y-3">
                     {items.map(item => {
@@ -201,7 +321,7 @@ export default function Purchases() {
               <TableRow><TableCell colSpan={6} className="text-center py-8">جاري التحميل...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">لا يوجد فواتير شراء</TableCell></TableRow>
-            ) : filtered.map((p: any) => (
+            ) : (filtered as any[]).map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-sm">{p.invoiceNumber || '-'}</TableCell>
                 <TableCell>{p.date}</TableCell>
@@ -213,9 +333,14 @@ export default function Purchases() {
                 </TableCell>
                 <TableCell className="font-bold">{p.grandTotal?.toLocaleString()} ر.س</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" title="طباعة الفاتورة" onClick={() => printPurchaseInvoice(p)}>
+                      <Printer className="w-4 h-4 text-green-600" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
