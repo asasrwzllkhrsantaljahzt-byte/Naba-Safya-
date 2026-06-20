@@ -1,1 +1,2 @@
 - [Admin Auth System](admin-auth.md) — HMAC-SHA256 tokens in localStorage, default admin auto-created, 3 roles: admin/manager/viewer
+- [Accounts & UI Patterns](accounts-ui-patterns.md) — chart of accounts schema + autocomplete combobox + notification bell patterns used in this project

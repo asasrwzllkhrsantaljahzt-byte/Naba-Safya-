@@ -4,10 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, CreditCard, Download, Database, CheckCircle, Package, Plus, Pencil, Trash2, Droplet } from "lucide-react";
+import { Building2, CreditCard, Download, Database, CheckCircle, Package, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -149,8 +147,8 @@ export default function Settings() {
   };
 
   const handleSaveProduct = async () => {
-    if (!productForm.name.trim()) return toast({ title: "خطأ", description: "اسم المنتج مطلوب", variant: "destructive" });
-    if (!productForm.unitPrice) return toast({ title: "خطأ", description: "السعر مطلوب", variant: "destructive" });
+    if (!productForm.name.trim()) { toast({ title: "خطأ", description: "اسم المنتج مطلوب", variant: "destructive" }); return; }
+    if (!productForm.unitPrice) { toast({ title: "خطأ", description: "السعر مطلوب", variant: "destructive" }); return; }
 
     const body = {
       name: productForm.name,
@@ -212,7 +210,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <Tabs defaultValue="products">
+      <Tabs defaultValue="factory">
         <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent mb-6 flex-wrap">
           <TabsTrigger
             value="products"
@@ -244,142 +242,33 @@ export default function Settings() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ===== PRODUCTS TAB ===== */}
+        {/* ===== PRODUCTS TAB (redirect) ===== */}
         <TabsContent value="products" className="mt-0">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>إدارة المنتجات</CardTitle>
-                <CardDescription>أنواع القوارير التي تظهر في فواتير البيع والشراء</CardDescription>
-              </div>
-              <Button onClick={openAddProduct}>
-                <Plus className="ml-2 w-4 h-4" /> إضافة منتج
-              </Button>
+            <CardHeader>
+              <CardTitle>إدارة المنتجات</CardTitle>
+              <CardDescription>تم نقل إدارة المنتجات إلى قسم المخزن</CardDescription>
             </CardHeader>
             <CardContent>
-              {productsLoading ? (
-                <div className="text-center py-8 text-muted-foreground">جاري التحميل...</div>
-              ) : products.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-lg font-medium">لا يوجد منتجات بعد</p>
-                  <p className="text-sm mt-1">أضف أنواع القوارير لتظهر في فواتير البيع والشراء</p>
-                  <Button className="mt-4" onClick={openAddProduct}><Plus className="ml-2 w-4 h-4" />إضافة أول منتج</Button>
+              <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
+                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center">
+                  <Package className="w-8 h-8 text-primary" />
                 </div>
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>اسم المنتج</TableHead>
-                        <TableHead>اللون</TableHead>
-                        <TableHead>سعر الوحدة</TableHead>
-                        <TableHead>نسبة الضريبة</TableHead>
-                        <TableHead>الوصف</TableHead>
-                        <TableHead>إجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="font-medium">{p.name}</TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${p.color === "blue" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}>
-                              <Droplet className="w-3 h-3" />
-                              {p.color === "blue" ? "زرقاء" : "بيضاء"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="font-bold">{p.unitPrice.toFixed(2)} ر.س</TableCell>
-                          <TableCell>{p.vatRate}%</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{p.description ?? "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEditProduct(p)}>
-                                <Pencil className="w-4 h-4 text-blue-600" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(p.id)}>
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">تم نقل إدارة المنتجات</h3>
+                  <p className="text-muted-foreground text-sm max-w-xs">
+                    يمكنك الآن إدارة المنتجات من قسم <strong>المخزن ← المنتجات</strong> في الشريط الجانبي
+                  </p>
                 </div>
-              )}
-
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800">
-                <strong>ملاحظة:</strong> القوارير الزرقاء تظهر في فواتير البيع، والقوارير البيضاء تستخدم في المشتريات وحركات المخزن.
+                <Link href="/inventory/products">
+                  <Button className="flex items-center gap-2">
+                    <ExternalLink className="w-4 h-4" />
+                    الذهاب إلى إدارة المنتجات
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
-
-          {/* Product Dialog */}
-          <Dialog open={productDialog} onOpenChange={setProductDialog}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editingProduct ? "تعديل المنتج" : "إضافة منتج جديد"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">اسم المنتج</label>
-                  <Input
-                    placeholder="مثال: عبوة 18.9 لتر"
-                    value={productForm.name}
-                    onChange={e => setProductForm({ ...productForm, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">اللون</label>
-                  <Select value={productForm.color} onValueChange={v => setProductForm({ ...productForm, color: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="blue">🔵 زرقاء (تظهر في فواتير البيع)</SelectItem>
-                      <SelectItem value="white">⚪ بيضاء (مشتريات ومخزن)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">سعر الوحدة (ر.س)</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={productForm.unitPrice}
-                      onChange={e => setProductForm({ ...productForm, unitPrice: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">نسبة الضريبة (%)</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      placeholder="15"
-                      value={productForm.vatRate}
-                      onChange={e => setProductForm({ ...productForm, vatRate: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">وصف (اختياري)</label>
-                  <Input
-                    placeholder="وصف إضافي..."
-                    value={productForm.description}
-                    onChange={e => setProductForm({ ...productForm, description: e.target.value })}
-                  />
-                </div>
-                <Button className="w-full" onClick={handleSaveProduct}>
-                  {editingProduct ? "حفظ التعديلات" : "إضافة المنتج"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
         {/* ===== FACTORY TAB ===== */}

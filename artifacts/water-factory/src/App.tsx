@@ -26,6 +26,8 @@ import OperationalCosts from "@/pages/operational-costs";
 import RepLogin from "@/pages/rep-login";
 import RepPortal from "@/pages/rep-portal";
 import Settings from "@/pages/settings";
+import Accounts from "@/pages/accounts";
+import InventoryProducts from "@/pages/inventory-products";
 import Login from "@/pages/login";
 import Users from "@/pages/users";
 import NotFound from "@/pages/not-found";
@@ -42,6 +44,7 @@ function AdminRouter() {
         <Route path="/customers" component={Customers} />
         <Route path="/reps" component={Reps} />
         <Route path="/inventory" component={Inventory} />
+        <Route path="/inventory/products" component={InventoryProducts} />
         <Route path="/inventory/vouchers" component={InventoryVouchers} />
         <Route path="/inventory/transactions" component={InventoryTransactions} />
         <Route path="/employees" component={Employees} />
@@ -55,6 +58,7 @@ function AdminRouter() {
         <Route path="/obligations" component={Obligations} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={Settings} />
+        <Route path="/accounts" component={Accounts} />
         <Route path="/users" component={Users} />
         <Route component={NotFound} />
       </Switch>
