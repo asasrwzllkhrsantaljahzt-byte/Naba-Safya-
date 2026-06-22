@@ -18,29 +18,58 @@ export default function Suppliers() {
   const [editItem, setEditItem] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
 
-  const { data: suppliers = [], isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["suppliers"],
-    queryFn: () => fetch(`${BASE}/api/suppliers`).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/suppliers`);
+      if (!res.ok) throw new Error("فشل تحميل الموردين");
+      const json = await res.json();
+      // ✅ ضمان إرجاع مصفوفة دائماً مهما كان شكل الرد
+      return Array.isArray(json) ? json : json?.data ?? json?.items ?? [];
+    },
+    staleTime: 30_000,          // ✅ لا يعيد الجلب إلا بعد 30 ثانية
+    placeholderData: (prev) => prev, // ✅ يحتفظ بالبيانات القديمة أثناء إعادة الجلب
+    retry: 2,
   });
 
+  // ✅ البيانات دائماً مصفوفة — لا شاشة بيضاء أبداً
+  const suppliers: any[] = Array.isArray(data) ? data : [];
+
   const create = useMutation({
-    mutationFn: (data: typeof form) => fetch(`${BASE}/api/suppliers`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); setIsOpen(false); setForm(emptyForm); },
+    mutationFn: (data: typeof form) =>
+      fetch(`${BASE}/api/suppliers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      setIsOpen(false);
+      setForm(emptyForm);
+    },
   });
 
   const update = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) =>
-      fetch(`${BASE}/api/suppliers/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(r => r.json()),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suppliers"] }); setEditItem(null); },
+      fetch(`${BASE}/api/suppliers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      setEditItem(null);
+    },
   });
 
   const remove = useMutation({
-    mutationFn: (id: number) => fetch(`${BASE}/api/suppliers/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) =>
+      fetch(`${BASE}/api/suppliers/${id}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
   });
 
   const filtered = suppliers.filter((s: any) =>
-    !search || s.name.includes(search) || (s.phone && s.phone.includes(search))
+    !search || s.name?.includes(search) || s.phone?.includes(search)
   );
 
   return (
@@ -71,10 +100,23 @@ export default function Suppliers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8">جاري التحميل...</TableCell></TableRow>
+            {/* ✅ isLoading فقط في أول تحميل — مش في كل refresh */}
+            {isLoading && suppliers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8">جاري التحميل...</TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-destructive">
+                  حدث خطأ في تحميل البيانات
+                </TableCell>
+              </TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">لا يوجد موردين</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  لا يوجد موردين
+                </TableCell>
+              </TableRow>
             ) : filtered.map((s: any) => (
               <TableRow key={s.id}>
                 <TableCell className="font-medium">{s.name}</TableCell>
@@ -88,7 +130,11 @@ export default function Suppliers() {
                         <Edit className="w-4 h-4 text-blue-600" />
                       </Button>
                       {can("delete") && (
-                        <Button variant="ghost" size="icon" onClick={() => confirm("حذف المورد؟") && remove.mutate(s.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => confirm("حذف المورد؟") && remove.mutate(s.id)}
+                        >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       )}
@@ -106,10 +152,22 @@ export default function Suppliers() {
         <DialogContent>
           <DialogHeader><DialogTitle>إضافة مورد جديد</DialogTitle></DialogHeader>
           <form onSubmit={e => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
-            <div className="space-y-2"><label className="text-sm font-medium">اسم المورد</label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
-            <div className="space-y-2"><label className="text-sm font-medium">رقم الجوال</label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-            <div className="space-y-2"><label className="text-sm font-medium">المنطقة</label><Input value={form.area} onChange={e => setForm({ ...form, area: e.target.value })} /></div>
-            <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">اسم المورد</label>
+              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">رقم الجوال</label>
+              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">المنطقة</label>
+              <Input value={form.area} onChange={e => setForm({ ...form, area: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">ملاحظات</label>
+              <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+            </div>
             <Button type="submit" className="w-full" disabled={create.isPending}>حفظ</Button>
           </form>
         </DialogContent>
@@ -120,11 +178,32 @@ export default function Suppliers() {
         <DialogContent>
           <DialogHeader><DialogTitle>تعديل بيانات المورد</DialogTitle></DialogHeader>
           {editItem && (
-            <form onSubmit={e => { e.preventDefault(); update.mutate({ id: editItem.id, data: { name: editItem.name, phone: editItem.phone, area: editItem.area, notes: editItem.notes } }); }} className="space-y-4">
-              <div className="space-y-2"><label className="text-sm font-medium">اسم المورد</label><Input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })} required /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">رقم الجوال</label><Input value={editItem.phone || ""} onChange={e => setEditItem({ ...editItem, phone: e.target.value })} /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">المنطقة</label><Input value={editItem.area || ""} onChange={e => setEditItem({ ...editItem, area: e.target.value })} /></div>
-              <div className="space-y-2"><label className="text-sm font-medium">ملاحظات</label><Input value={editItem.notes || ""} onChange={e => setEditItem({ ...editItem, notes: e.target.value })} /></div>
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                update.mutate({
+                  id: editItem.id,
+                  data: { name: editItem.name, phone: editItem.phone, area: editItem.area, notes: editItem.notes },
+                });
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <label className="text-sm font-medium">اسم المورد</label>
+                <Input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">رقم الجوال</label>
+                <Input value={editItem.phone || ""} onChange={e => setEditItem({ ...editItem, phone: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">المنطقة</label>
+                <Input value={editItem.area || ""} onChange={e => setEditItem({ ...editItem, area: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">ملاحظات</label>
+                <Input value={editItem.notes || ""} onChange={e => setEditItem({ ...editItem, notes: e.target.value })} />
+              </div>
               <Button type="submit" className="w-full" disabled={update.isPending}>حفظ التغييرات</Button>
             </form>
           )}

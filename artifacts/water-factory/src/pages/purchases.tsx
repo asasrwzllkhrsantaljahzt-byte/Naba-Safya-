@@ -326,7 +326,13 @@ export default function Purchases() {
   const [filterPayment, setFilterPayment] = useState("");
 
   const { data: purchases = [], isLoading } = useListPurchases();
-  const { data: products = [], refetch: refetchProducts } = useListProducts();
+const { data: productsResponse, refetch: refetchProducts } = useListProducts();
+
+const products = Array.isArray(productsResponse)
+  ? productsResponse
+  : Array.isArray((productsResponse as any)?.data)
+    ? (productsResponse as any).data
+    : [];useListProducts();
   const createPurchase = useCreatePurchase();
   const deletePurchase = useDeletePurchase();
   const [isOpen, setIsOpen] = useState(false);
@@ -395,7 +401,13 @@ export default function Purchases() {
     }
   };
 
-  const filtered = (purchases as any[]).filter((p: any) => {
+  const safePurchases = Array.isArray(purchases)
+  ? purchases
+  : Array.isArray((purchases as any)?.data)
+    ? (purchases as any).data
+    : [];
+
+const filtered = safePurchases.filter((p: any) => {
     if (from && p.date < from) return false;
     if (to && p.date > to) return false;
     if (filterSupplier && !p.supplierName?.includes(filterSupplier)) return false;

@@ -11,16 +11,35 @@ import { useAuth } from "@/lib/auth";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type Product = {
-  id: number; name: string; color: string;
-  unitPrice: number; vatRate: number; description?: string | null;
+// 🔥 حماية قوية: أي حاجة تتحول لمصفوفة
+const safeArray = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  if (data?.items && Array.isArray(data.items)) return data.items;
+  return [];
 };
 
-const emptyProduct = { name: "", color: "blue", unitPrice: "", vatRate: "15", description: "" };
+type Product = {
+  id: number;
+  name: string;
+  color: string;
+  unitPrice: number;
+  vatRate: number;
+  description?: string | null;
+};
+
+const emptyProduct = {
+  name: "",
+  color: "blue",
+  unitPrice: "",
+  vatRate: "15",
+  description: ""
+};
 
 export default function InventoryProducts() {
   const { toast } = useToast();
   const { can } = useAuth();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState(false);
@@ -29,44 +48,86 @@ export default function InventoryProducts() {
 
   const load = () => {
     setLoading(true);
+
     fetch(`${BASE}/api/products`)
       .then(r => r.json())
-      .then(setProducts)
-      .catch(() => toast({ title: "خطأ", variant: "destructive" }))
+      .then((data) => {
+        setProducts(safeArray(data));
+      })
+      .catch(() => toast({ title: "خطأ في تحميل المنتجات", variant: "destructive" }))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const openAdd = () => { setEditing(null); setForm(emptyProduct); setDialog(true); };
+  const openAdd = () => {
+    setEditing(null);
+    setForm(emptyProduct);
+    setDialog(true);
+  };
+
   const openEdit = (p: Product) => {
     setEditing(p);
-    setForm({ name: p.name, color: p.color, unitPrice: String(p.unitPrice), vatRate: String(p.vatRate), description: p.description ?? "" });
+    setForm({
+      name: p.name,
+      color: p.color,
+      unitPrice: String(p.unitPrice),
+      vatRate: String(p.vatRate),
+      description: p.description ?? ""
+    });
     setDialog(true);
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { toast({ title: "خطأ", description: "اسم المنتج مطلوب", variant: "destructive" }); return; }
-    const body = { name: form.name, color: form.color, unitPrice: parseFloat(form.unitPrice), vatRate: parseFloat(form.vatRate), description: form.description || null };
+    if (!form.name.trim()) {
+      toast({ title: "اسم المنتج مطلوب", variant: "destructive" });
+      return;
+    }
+
+    const body = {
+      name: form.name,
+      color: form.color,
+      unitPrice: Number(form.unitPrice) || 0,
+      vatRate: Number(form.vatRate) || 15,
+      description: form.description || null
+    };
+
     try {
       if (editing) {
-        await fetch(`${BASE}/api/products/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        await fetch(`${BASE}/api/products/${editing.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
         toast({ title: "تم التعديل" });
       } else {
-        await fetch(`${BASE}/api/products`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        await fetch(`${BASE}/api/products`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
         toast({ title: "تمت الإضافة" });
       }
+
       setDialog(false);
       load();
-    } catch { toast({ title: "خطأ", variant: "destructive" }); }
+    } catch {
+      toast({ title: "خطأ في الحفظ", variant: "destructive" });
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm("حذف هذا المنتج؟")) return;
+
     await fetch(`${BASE}/api/products/${id}`, { method: "DELETE" });
     toast({ title: "تم الحذف" });
     load();
   };
+
+  // 🔥 ضمان أن المنتجات دائمًا Array
+  const safeProducts = safeArray(products);
 
   return (
     <div className="space-y-6">
@@ -74,107 +135,103 @@ export default function InventoryProducts() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>إدارة المنتجات</CardTitle>
-            <CardDescription>أنواع القوارير التي تظهر في فواتير البيع والشراء</CardDescription>
+            <CardDescription>أنواع القوارير في النظام</CardDescription>
           </div>
+
           {can("edit") && (
-            <Button onClick={openAdd}><Plus className="ml-2 w-4 h-4" /> إضافة منتج</Button>
+            <Button onClick={openAdd}>
+              <Plus className="ml-2 w-4 h-4" />
+              إضافة منتج
+            </Button>
           )}
         </CardHeader>
+
         <CardContent>
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">جاري التحميل...</div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-lg font-medium">لا يوجد منتجات بعد</p>
-              <Button className="mt-4" onClick={openAdd}><Plus className="ml-2 w-4 h-4" />إضافة أول منتج</Button>
+          ) : safeProducts.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              لا يوجد منتجات
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>اسم المنتج</TableHead>
-                    <TableHead>اللون</TableHead>
-                    <TableHead>سعر الوحدة</TableHead>
-                    <TableHead>نسبة الضريبة</TableHead>
-                    <TableHead>الوصف</TableHead>
-                    {can("edit") && <TableHead>إجراءات</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.name}</TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>اسم المنتج</TableHead>
+                  <TableHead>اللون</TableHead>
+                  <TableHead>السعر</TableHead>
+                  <TableHead>الضريبة</TableHead>
+                  <TableHead>الوصف</TableHead>
+                  {can("edit") && <TableHead>إجراءات</TableHead>}
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {safeProducts.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+
+                    <TableCell>
+                      <span className="text-xs px-2 py-1 rounded bg-muted">
+                        {p.color === "blue" ? "زرقاء" : "بيضاء"}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>{Number(p.unitPrice).toFixed(2)}</TableCell>
+                    <TableCell>{p.vatRate}%</TableCell>
+                    <TableCell>{p.description || "-"}</TableCell>
+
+                    {can("edit") && (
                       <TableCell>
-                        <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${p.color === "blue" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}>
-                          <Droplet className="w-3 h-3" />
-                          {p.color === "blue" ? "زرقاء" : "بيضاء"}
-                        </span>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
+                            <Pencil className="w-4 h-4 text-blue-600" />
+                          </Button>
+
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-bold">{p.unitPrice.toFixed(2)} ر.س</TableCell>
-                      <TableCell>{p.vatRate}%</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{p.description ?? "-"}</TableCell>
-                      {can("edit") && (
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
-                              <Pencil className="w-4 h-4 text-blue-600" />
-                            </Button>
-                            {can("delete") && (
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800">
-            <strong>ملاحظة:</strong> القوارير الزرقاء تظهر في فواتير البيع، والقوارير البيضاء تُستخدم في المشتريات وحركات المخزن.
-          </div>
         </CardContent>
       </Card>
 
+      {/* Dialog */}
       <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editing ? "تعديل المنتج" : "إضافة منتج جديد"}</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">اسم المنتج</label>
-              <Input placeholder="مثال: عبوة 18.9 لتر" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">اللون</label>
-              <Select value={form.color} onValueChange={v => setForm({ ...form, color: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="blue">🔵 زرقاء (تظهر في فواتير البيع)</SelectItem>
-                  <SelectItem value="white">⚪ بيضاء (مشتريات ومخزن)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">سعر الوحدة (ر.س)</label>
-                <Input type="number" min="0" step="0.01" placeholder="0.00" value={form.unitPrice} onChange={e => setForm({ ...form, unitPrice: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">نسبة الضريبة (%)</label>
-                <Input type="number" min="0" max="100" placeholder="15" value={form.vatRate} onChange={e => setForm({ ...form, vatRate: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">وصف (اختياري)</label>
-              <Input placeholder="وصف إضافي..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-            </div>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "تعديل منتج" : "إضافة منتج"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              placeholder="اسم المنتج"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+            />
+
+            <Input
+              placeholder="السعر"
+              type="number"
+              value={form.unitPrice}
+              onChange={e => setForm({ ...form, unitPrice: e.target.value })}
+            />
+
+            <Input
+              placeholder="الضريبة"
+              type="number"
+              value={form.vatRate}
+              onChange={e => setForm({ ...form, vatRate: e.target.value })}
+            />
+
             <Button className="w-full" onClick={handleSave}>
-              {editing ? "حفظ التعديلات" : "إضافة المنتج"}
+              حفظ
             </Button>
           </div>
         </DialogContent>
