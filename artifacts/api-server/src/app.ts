@@ -28,8 +28,9 @@ app.use("/api", router);
 const frontendPath = path.join(process.cwd(), "../water-factory/dist/public");
 app.use(express.static(frontendPath));
 
+// تم إضافة return هنا لإغلاق المسار برمجياً بشكل سليم بنسبة 100%
 app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(frontendPath, "index.html"));
+  return res.sendFile(path.join(frontendPath, "index.html"));
 });
 
 export default app;

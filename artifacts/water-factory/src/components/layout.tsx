@@ -2,9 +2,9 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Droplets, LayoutDashboard, ShoppingCart, Truck, Package,
-  Receipt, Wallet, BarChart3, ChevronDown, ChevronLeft,
-  UserCog, UsersRound, Calculator, Settings, ShieldCheck, LogIn, LogOut,
-  Bell, BookOpen, X
+  Wallet, BarChart3, ChevronDown, ChevronLeft,
+  UserCog, UsersRound, Settings, ShieldCheck, LogIn, LogOut,
+  Bell, BookOpen, X, Building2, FileText
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -17,65 +17,48 @@ type NavItem = { name: string; icon: React.ElementType; href?: string; sub?: Sub
 const nav: NavItem[] = [
   { name: "لوحة المتابعة", icon: LayoutDashboard, href: "/" },
   {
+    name: "المالية", icon: Wallet,
+    sub: [
+      { name: "خزينة وبنوك", href: "/treasury" },
+      { name: "القيود المحاسبية", href: "/journal-entries" },
+      { name: "دليل الحسابات", href: "/accounts" },
+    ]
+  },
+  {
     name: "المشتريات", icon: ShoppingCart,
     sub: [
+      { name: "طلبات الشراء", href: "/purchase-orders" },
       { name: "فواتير المشتريات", href: "/purchases" },
+      { name: "مرتجع مشتريات", href: "/purchase-returns" },
       { name: "الموردين", href: "/suppliers" },
     ]
   },
   {
     name: "المبيعات", icon: Truck,
     sub: [
+      { name: "طلبات البيع", href: "/sale-orders" },
       { name: "فواتير المبيعات", href: "/sales" },
+      { name: "مرتجع مبيعات", href: "/sale-returns" },
       { name: "العملاء", href: "/customers" },
     ]
   },
   {
-    name: "المخزن", icon: Package,
+    name: "المخازن", icon: Package,
     sub: [
-      { name: "رصيد المخزن", href: "/inventory" },
       { name: "المنتجات", href: "/inventory/products" },
-      { name: "سند استلام / صرف", href: "/inventory/vouchers" },
-      { name: "حركة المخزن", href: "/inventory/transactions" },
+      { name: "الحركات", href: "/inventory/transactions" },
+      { name: "تسوية مخزن", href: "/inventory/vouchers" },
     ]
   },
   {
     name: "الموظفين", icon: UserCog,
     sub: [
-      { name: "قائمة الموظفين", href: "/employees" },
+      { name: "بيانات الموظفين", href: "/employees" },
+      { name: "الرواتب", href: "/payroll" },
       { name: "الحضور والغياب", href: "/attendance" },
-      { name: "الرواتب والعمولات", href: "/payroll" },
-    ]
-  },
-  {
-    name: "المندوبين", icon: UsersRound,
-    sub: [
-      { name: "قائمة المندوبين", href: "/reps" },
-      { name: "عهدة المناديب", href: "/rep-custody" },
-    ]
-  },
-  {
-    name: "المصروفات", icon: Receipt,
-    sub: [
-      { name: "المصروفات العامة", href: "/expenses" },
-      { name: "مراكز التكلفة", href: "/cost-centers" },
-    ]
-  },
-  {
-    name: "التكاليف والأرباح", icon: Calculator,
-    sub: [
-      { name: "التكاليف التشغيلية", href: "/operational-costs" },
-    ]
-  },
-  {
-    name: "الخزينة", icon: Wallet,
-    sub: [
-      { name: "الخزينة", href: "/treasury" },
-      { name: "الالتزامات", href: "/obligations" },
     ]
   },
   { name: "التقارير", icon: BarChart3, href: "/reports" },
-  { name: "دليل الحسابات", icon: BookOpen, href: "/accounts" },
   { name: "الإعدادات", icon: Settings, href: "/settings" },
 ];
 
@@ -103,51 +86,37 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
       fetch(`${BASE}/api/obligations`).then(r => r.json()).catch(() => []),
     ]).then(([sales, purchases, expenses, obligations]) => {
       const result: Notification[] = [];
-
       (sales as any[]).filter(s => s.date === today).forEach(s => result.push({
-        id: `sale-${s.id}`,
-        type: "sale",
+        id: `sale-${s.id}`, type: "sale",
         title: `فاتورة بيع - ${s.customerName}`,
         desc: `${s.repName ?? ""} | ${s.orderNumber ?? ""}`,
-        time: s.date,
-        amount: parseFloat(s.grandTotal),
+        time: s.date, amount: parseFloat(s.grandTotal),
       }));
-
       (purchases as any[]).filter(p => p.date === today).forEach(p => result.push({
-        id: `pur-${p.id}`,
-        type: "purchase",
+        id: `pur-${p.id}`, type: "purchase",
         title: `فاتورة شراء - ${p.supplierName ?? "مورد"}`,
         desc: p.invoiceNumber ?? "",
-        time: p.date,
-        amount: parseFloat(p.grandTotal),
+        time: p.date, amount: parseFloat(p.grandTotal),
       }));
-
       (expenses as any[]).filter(e => e.date === today).forEach(e => result.push({
-        id: `exp-${e.id}`,
-        type: "expense",
+        id: `exp-${e.id}`, type: "expense",
         title: `مصروف - ${e.description}`,
         desc: e.category ?? "",
-        time: e.date,
-        amount: parseFloat(e.amount),
+        time: e.date, amount: parseFloat(e.amount),
       }));
-
       (obligations as any[]).filter(o => o.dueDate === today && parseFloat(o.remainingAmount ?? o.totalAmount) > 0).forEach(o => result.push({
-        id: `obl-${o.id}`,
-        type: "payment",
+        id: `obl-${o.id}`, type: "payment",
         title: `التزام مستحق - ${o.supplierName}`,
         desc: `المتبقي: ${parseFloat(o.remainingAmount ?? o.totalAmount).toFixed(2)} ر.س`,
         time: o.dueDate,
       }));
-
       setNotes(result.sort((a, b) => b.id.localeCompare(a.id)));
     }).finally(() => setLoading(false));
   }, []);
 
   const typeColors: Record<string, string> = {
-    sale: "bg-green-100 text-green-700",
-    purchase: "bg-blue-100 text-blue-700",
-    expense: "bg-red-100 text-red-700",
-    payment: "bg-orange-100 text-orange-700",
+    sale: "bg-green-100 text-green-700", purchase: "bg-blue-100 text-blue-700",
+    expense: "bg-red-100 text-red-700", payment: "bg-orange-100 text-orange-700",
   };
   const typeLabels: Record<string, string> = {
     sale: "بيع", purchase: "شراء", expense: "مصروف", payment: "التزام",
@@ -213,7 +182,6 @@ export function Layout({ children }: { children: ReactNode }) {
       if (item.sub) { const s = item.sub.find(x => x.href === location); if (s) return s.name; }
     }
     if (location === "/users") return "إدارة المستخدمين";
-    if (location === "/accounts") return "دليل الحسابات";
     return "النظام";
   };
 
@@ -326,10 +294,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <h2 className="font-semibold">{currentPageName()}</h2>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <button
-                onClick={() => setShowNotifications(v => !v)}
-                className="relative p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-              >
+              <button onClick={() => setShowNotifications(v => !v)} className="relative p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
                 <Bell className="w-5 h-5" />
                 {todayCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">

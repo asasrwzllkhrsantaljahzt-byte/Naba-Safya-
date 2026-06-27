@@ -18,8 +18,11 @@ function fmt(e: typeof employeesTable.$inferSelect) {
 router.get("/employees", async (req, res) => {
   try {
     const employees = await db.select().from(employeesTable).orderBy(employeesTable.name);
-    res.json(employees.map(fmt));
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في جلب الموظفين" }); }
+    return res.json(employees.map(fmt));
+  } catch (err) { 
+    req.log.error(err); 
+    return res.status(500).json({ error: "فشل في جلب الموظفين" }); 
+  }
 });
 
 router.post("/employees", async (req, res) => {
@@ -32,8 +35,11 @@ router.post("/employees", async (req, res) => {
       transportAllowance: String(transportAllowance ?? 0),
       notes,
     }).returning();
-    res.status(201).json(fmt(emp));
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في إضافة الموظف" }); }
+    return res.status(201).json(fmt(emp));
+  } catch (err) { 
+    req.log.error(err); 
+    return res.status(500).json({ error: "فشل في إضافة الموظف" }); 
+  }
 });
 
 router.patch("/employees/:id", async (req, res) => {
@@ -53,16 +59,22 @@ router.patch("/employees/:id", async (req, res) => {
     if (isActive !== undefined) updates.isActive = String(isActive);
     const [emp] = await db.update(employeesTable).set(updates).where(eq(employeesTable.id, id)).returning();
     if (!emp) return res.status(404).json({ error: "الموظف غير موجود" });
-    res.json(fmt(emp));
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في تحديث الموظف" }); }
+    return res.json(fmt(emp));
+  } catch (err) { 
+    req.log.error(err); 
+    return res.status(500).json({ error: "فشل في تحديث الموظف" }); 
+  }
 });
 
 router.delete("/employees/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(employeesTable).where(eq(employeesTable.id, id));
-    res.status(204).end();
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في حذف الموظف" }); }
+    return res.status(204).end();
+  } catch (err) { 
+    req.log.error(err); 
+    return res.status(500).json({ error: "فشل في حذف الموظف" }); 
+  }
 });
 
 // Generate monthly salary obligation for all active employees
@@ -91,8 +103,11 @@ router.post("/employees/generate-salary-obligations", async (req, res) => {
       }).returning();
       created.push(obl);
     }
-    res.status(201).json({ created: created.length, obligations: created });
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في توليد التزامات الرواتب" }); }
+    return res.status(201).json({ created: created.length, obligations: created });
+  } catch (err) { 
+    req.log.error(err); 
+    return res.status(500).json({ error: "فشل في توليد التزامات الرواتب" }); 
+  }
 });
 
 export default router;

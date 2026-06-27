@@ -34,10 +34,11 @@ router.get("/sales", async (req, res) => {
     if (to) sales = sales.filter((s) => s.date <= to);
     if (repId) sales = sales.filter((s) => s.repId === parseInt(repId));
     if (customerId) sales = sales.filter((s) => s.customerId === parseInt(customerId));
-    res.json(sales.map(formatSale));
+    
+    return res.json(sales.map(formatSale));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في جلب طلبيات البيع" });
+    return res.status(500).json({ error: "فشل في جلب طلبيات البيع" });
   }
 });
 
@@ -139,10 +140,10 @@ router.post("/sales", async (req, res) => {
       .set({ lastVisitDate: date })
       .where(eq(customersTable.id, customerId));
 
-    res.status(201).json(formatSale(sale));
+    return res.status(201).json(formatSale(sale));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في إضافة طلبية البيع" });
+    return res.status(500).json({ error: "فشل في إضافة طلبية البيع" });
   }
 });
 
@@ -151,10 +152,11 @@ router.get("/sales/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, id));
     if (!sale) return res.status(404).json({ error: "طلبية البيع غير موجودة" });
-    res.json(formatSale(sale));
+    
+    return res.json(formatSale(sale));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في جلب طلبية البيع" });
+    return res.status(500).json({ error: "فشل في جلب طلبية البيع" });
   }
 });
 
@@ -162,10 +164,11 @@ router.delete("/sales/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(salesTable).where(eq(salesTable.id, id));
-    res.status(204).end();
+    
+    return res.status(204).end();
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في حذف طلبية البيع" });
+    return res.status(500).json({ error: "فشل في حذف طلبية البيع" });
   }
 });
 

@@ -47,7 +47,12 @@ router.post("/inventory/vouchers", async (req, res) => {
   try {
     const { date, type, productId, quantity, reference, notes } = req.body;
     const [product] = await db.select().from(productsTable).where(eq(productsTable.id, productId));
-    if (!product) return res.status(400).json({ error: "المنتج غير موجود" });
+    
+    // FIX: Separated the response from the return statement
+    if (!product) {
+      res.status(400).json({ error: "المنتج غير موجود" });
+      return;
+    }
 
     const [existing] = await db.select().from(inventoryTable).where(eq(inventoryTable.productId, productId));
     if (type === "in") {
@@ -82,7 +87,12 @@ router.delete("/inventory/transactions/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [txn] = await db.select().from(inventoryTransactionsTable).where(eq(inventoryTransactionsTable.id, id));
-    if (!txn) return res.status(404).json({ error: "السند غير موجود" });
+    
+    // FIX: Separated the response from the return statement
+    if (!txn) {
+      res.status(404).json({ error: "السند غير موجود" });
+      return;
+    }
 
     if (txn.referenceType === "voucher") {
       const [existing] = await db.select().from(inventoryTable).where(eq(inventoryTable.productId, txn.productId));

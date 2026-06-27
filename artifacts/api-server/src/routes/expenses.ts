@@ -21,7 +21,7 @@ const EXPENSE_CATEGORIES = [
 const router = Router();
 
 router.get("/expense-categories", async (req, res) => {
-  res.json(EXPENSE_CATEGORIES);
+  return res.json(EXPENSE_CATEGORIES);
 });
 
 router.get("/expenses", async (req, res) => {
@@ -31,10 +31,10 @@ router.get("/expenses", async (req, res) => {
     if (from) expenses = expenses.filter((e) => e.date >= from);
     if (to) expenses = expenses.filter((e) => e.date <= to);
     if (category) expenses = expenses.filter((e) => e.category === category);
-    res.json(expenses.map((e) => ({ ...e, amount: parseFloat(e.amount), createdAt: e.createdAt.toISOString() })));
+    return res.json(expenses.map((e) => ({ ...e, amount: parseFloat(e.amount), createdAt: e.createdAt.toISOString() })));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في جلب المصروفات" });
+    return res.status(500).json({ error: "فشل في جلب المصروفات" });
   }
 });
 
@@ -55,10 +55,10 @@ router.post("/expenses", async (req, res) => {
       reference: `EXP-${expense.id}`,
     });
 
-    res.status(201).json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
+    return res.status(201).json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في إضافة المصروف" });
+    return res.status(500).json({ error: "فشل في إضافة المصروف" });
   }
 });
 
@@ -67,10 +67,11 @@ router.get("/expenses/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const [expense] = await db.select().from(expensesTable).where(eq(expensesTable.id, id));
     if (!expense) return res.status(404).json({ error: "المصروف غير موجود" });
-    res.json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
+    // تم تصحيح الكلمة هنا من e إلى expense
+    return res.json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في جلب المصروف" });
+    return res.status(500).json({ error: "فشل في جلب المصروف" });
   }
 });
 
@@ -86,10 +87,10 @@ router.patch("/expenses/:id", async (req, res) => {
     if (notes !== undefined) updates.notes = notes;
     const [expense] = await db.update(expensesTable).set(updates).where(eq(expensesTable.id, id)).returning();
     if (!expense) return res.status(404).json({ error: "المصروف غير موجود" });
-    res.json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
+    return res.json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في تحديث المصروف" });
+    return res.status(500).json({ error: "فشل في تحديث المصروف" });
   }
 });
 
@@ -97,10 +98,10 @@ router.delete("/expenses/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(expensesTable).where(eq(expensesTable.id, id));
-    res.status(204).end();
+    return res.status(204).end();
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في حذف المصروف" });
+    return res.status(500).json({ error: "فشل في حذف المصروف" });
   }
 });
 

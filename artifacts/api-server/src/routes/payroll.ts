@@ -34,7 +34,12 @@ router.post("/payroll", async (req, res) => {
   try {
     const { employeeId, month, basicSalary, housingAllowance, transportAllowance, overtimeAmount, commissions, deductions, absenceDeductions, notes } = req.body;
     const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, employeeId));
-    if (!emp) return res.status(400).json({ error: "الموظف غير موجود" });
+    
+    // FIX: فصل الإرسال عن سطر الـ return (سطر 33)
+    if (!emp) {
+      res.status(400).json({ error: "الموظف غير موجود" });
+      return;
+    }
 
     const net = (parseFloat(basicSalary ?? emp.basicSalary ?? 0))
       + (parseFloat(housingAllowance ?? emp.housingAllowance ?? 0))
@@ -81,8 +86,18 @@ router.patch("/payroll/:id/pay", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [record] = await db.select().from(payrollTable).where(eq(payrollTable.id, id));
-    if (!record) return res.status(404).json({ error: "السجل غير موجود" });
-    if (record.isPaid === "true") return res.status(400).json({ error: "الراتب مدفوع مسبقاً" });
+    
+    // FIX: فصل الإرسال عن سطر الـ return (سطر 80)
+    if (!record) {
+      res.status(404).json({ error: "السجل غير موجود" });
+      return;
+    }
+    
+    // FIX: فصل الإرسال عن سطر الـ return (سطر 81)
+    if (record.isPaid === "true") {
+      res.status(400).json({ error: "الراتب مدفوع مسبقاً" });
+      return;
+    }
 
     const paidDate = new Date().toISOString().split("T")[0];
     const [updated] = await db.update(payrollTable).set({ isPaid: "true", paidDate }).where(eq(payrollTable.id, id)).returning();

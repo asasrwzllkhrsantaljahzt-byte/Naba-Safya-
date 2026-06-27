@@ -38,10 +38,11 @@ router.post("/auth/rep/:id/set-password", async (req, res) => {
     const hashed = hashPassword(password);
     const [rep] = await db.update(repsTable).set({ password: hashed }).where(eq(repsTable.id, id)).returning();
     if (!rep) return res.status(404).json({ error: "المندوب غير موجود" });
-    res.json({ success: true, message: "تم تعيين كلمة المرور" });
+    
+    return res.json({ success: true, message: "تم تعيين كلمة المرور" });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في تعيين كلمة المرور" });
+    return res.status(500).json({ error: "فشل في تعيين كلمة المرور" });
   }
 });
 
@@ -61,7 +62,7 @@ router.post("/auth/rep/login", async (req, res) => {
     if (hashed !== rep.password) return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
 
     const token = makeToken(rep.id);
-    res.json({
+    return res.json({
       token,
       rep: {
         id: rep.id,
@@ -72,7 +73,7 @@ router.post("/auth/rep/login", async (req, res) => {
     });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في تسجيل الدخول" });
+    return res.status(500).json({ error: "فشل في تسجيل الدخول" });
   }
 });
 
@@ -88,10 +89,10 @@ router.get("/auth/rep/me", async (req, res) => {
     const [rep] = await db.select().from(repsTable).where(eq(repsTable.id, payload.repId));
     if (!rep || !rep.isActive) return res.status(401).json({ error: "الحساب غير نشط" });
 
-    res.json({ id: rep.id, name: rep.name, phone: rep.phone, area: rep.area });
+    return res.json({ id: rep.id, name: rep.name, phone: rep.phone, area: rep.area });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في التحقق" });
+    return res.status(500).json({ error: "فشل في التحقق" });
   }
 });
 

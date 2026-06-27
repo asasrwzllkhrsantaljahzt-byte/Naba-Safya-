@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, pgEnum, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,8 +11,10 @@ export const accountsTable = pgTable("accounts", {
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
   type: accountTypeEnum("type").notNull(),
-  openingBalance: numeric("opening_balance", { precision: 12, scale: 2 }).notNull().default("0"),
+  openingBalance: numeric("opening_balance", { precision:12, scale: 2 }).notNull().default("0"),
   notes: text("notes"),
+  parentId: integer("parent_id"),
+  level: integer("level").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

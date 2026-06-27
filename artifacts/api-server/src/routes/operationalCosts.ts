@@ -55,7 +55,13 @@ router.patch("/operational-costs/:id", async (req, res) => {
     if (amount !== undefined) updates.amount = String(amount);
     if (notes !== undefined) updates.notes = notes;
     const [cost] = await db.update(operationalCostsTable).set(updates).where(eq(operationalCostsTable.id, id)).returning();
-    if (!cost) return res.status(404).json({ error: "التكلفة غير موجودة" });
+    
+    // التعديل هنا لحل مشكلة ts(7030)
+    if (!cost) {
+      res.status(404).json({ error: "التكلفة غير موجودة" });
+      return;
+    }
+    
     res.json({ ...cost, amount: parseFloat(cost.amount), createdAt: cost.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);

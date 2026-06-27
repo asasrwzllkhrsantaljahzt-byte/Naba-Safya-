@@ -52,7 +52,13 @@ router.patch("/obligations/:id", async (req, res) => {
     if (amount !== undefined) updates.amount = String(amount);
     if (notes !== undefined) updates.notes = notes;
     const [record] = await db.update(obligationsTable).set(updates).where(eq(obligationsTable.id, id)).returning();
-    if (!record) return res.status(404).json({ error: "الالتزام غير موجود" });
+    
+    // FIX: Separated the response from the return statement (Line 42)
+    if (!record) {
+      res.status(404).json({ error: "الالتزام غير موجود" });
+      return;
+    }
+    
     res.json(fmt(record));
   } catch (err) { req.log.error(err); res.status(500).json({ error: "فشل في تحديث الالتزام" }); }
 });
@@ -63,7 +69,12 @@ router.patch("/obligations/:id/pay", async (req, res) => {
     const id = parseInt(req.params.id);
     const { payAmount, date } = req.body;
     const [record] = await db.select().from(obligationsTable).where(eq(obligationsTable.id, id));
-    if (!record) return res.status(404).json({ error: "الالتزام غير موجود" });
+    
+    // FIX: Separated the response from the return statement (Line 61)
+    if (!record) {
+      res.status(404).json({ error: "الالتزام غير موجود" });
+      return;
+    }
 
     const total = parseFloat(record.amount);
     const alreadyPaid = parseFloat(record.paidAmount ?? "0");

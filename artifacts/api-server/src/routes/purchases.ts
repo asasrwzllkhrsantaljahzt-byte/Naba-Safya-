@@ -30,10 +30,10 @@ router.get("/purchases", async (req, res) => {
     let purchases = await db.select().from(purchasesTable).orderBy(purchasesTable.date);
     if (from) purchases = purchases.filter((p) => p.date >= from);
     if (to) purchases = purchases.filter((p) => p.date <= to);
-    res.json(purchases.map(formatPurchase));
+    return res.json(purchases.map(formatPurchase));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في جلب فواتير الشراء" });
+    return res.status(500).json({ error: "فشل في جلب فواتير الشراء" });
   }
 });
 
@@ -120,10 +120,10 @@ router.post("/purchases", async (req, res) => {
       });
     }
 
-    res.status(201).json(formatPurchase(purchase));
+    return res.status(201).json(formatPurchase(purchase));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في إضافة فاتورة الشراء" });
+    return res.status(500).json({ error: "فشل في إضافة فاتورة الشراء" });
   }
 });
 
@@ -132,10 +132,10 @@ router.get("/purchases/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const [purchase] = await db.select().from(purchasesTable).where(eq(purchasesTable.id, id));
     if (!purchase) return res.status(404).json({ error: "فاتورة الشراء غير موجودة" });
-    res.json(formatPurchase(purchase));
+    return res.json(formatPurchase(purchase));
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في جلب فاتورة الشراء" });
+    return res.status(500).json({ error: "فشل في جلب فاتورة الشراء" });
   }
 });
 
@@ -143,10 +143,10 @@ router.delete("/purchases/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(purchasesTable).where(eq(purchasesTable.id, id));
-    res.status(204).end();
+    return res.status(204).end();
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "فشل في حذف فاتورة الشراء" });
+    return res.status(500).json({ error: "فشل في حذف فاتورة الشراء" });
   }
 });
 

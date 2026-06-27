@@ -42,7 +42,12 @@ export default function Customers() {
 
   const { data: reps = [] } = useQuery({
     queryKey: ["reps"],
-    queryFn: () => fetch(`${BASE}/api/reps`).then(r => r.json()),
+    queryFn: async () => {
+  const res = await fetch(`${BASE}/api/reps`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return Array.isArray(json) ? json : [];
+},
     staleTime: 60_000,
   });
 

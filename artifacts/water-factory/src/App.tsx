@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Component, ErrorInfo, ReactNode } from "react";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,7 +34,70 @@ import Users from "@/pages/users";
 import NotFound from "@/pages/not-found";
 import { queryClient } from "@/lib/utils";
 
+// ✅ تعريف الأنواع بشكل صريح لمنع ارتباك الـ TypeScript
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+// ✅ تم إصلاح الكلاس وإضافة الأنواع الممررة بشكل صحيح
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  override state: ErrorBoundaryState = { hasError: false, error: undefined };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("🔴 App Error:", error, info.componentStack);
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen gap-4 text-center p-8">
+          <div className="text-5xl">⚠️</div>
+          <h2 className="text-xl font-bold">حدث خطأ غير متوقع</h2>
+          <p className="text-muted-foreground text-sm">
+            {this.state.error?.message ?? "خطأ في تحميل الصفحة"}
+          </p>
+          <button
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
+            onClick={() => {
+              this.setState({ hasError: false, error: undefined });
+              window.location.reload();
+            }}
+          >
+            إعادة تحميل الصفحة
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function AdminRouter() {
+  const { user, isLoading } = useAuth();
+
+  // ✅ انتظر تحميل بيانات المستخدم لمنع الـ Flash Screens
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">جاري التحميل...</div>
+      </div>
+    );
+  }
+
+  // ✅ حماية المسارات: لو غير مسجل، حوّله لصفحة الدخول فوراً
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
   return (
     <Layout>
       <Switch>
@@ -67,22 +131,27 @@ function AdminRouter() {
 }
 
 function App() {
+  // تأمين جلب الـ Base URL لتجنب أي أخطاء قراءة من المترجم
+  const baseUrl = (import.meta.env.BASE_URL || "").replace(/\/$/, "");
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Switch>
-              <Route path="/rep-login" component={RepLogin} />
-              <Route path="/rep-portal" component={RepPortal} />
-              <Route path="/login" component={Login} />
-              <Route component={AdminRouter} />
-            </Switch>
-          </WouterRouter>
-          <Toaster />
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <WouterRouter base={baseUrl}>
+              <Switch>
+                <Route path="/rep-login" component={RepLogin} />
+                <Route path="/rep-portal" component={RepPortal} />
+                <Route path="/login" component={Login} />
+                <Route component={AdminRouter} />
+              </Switch>
+            </WouterRouter>
+            <Toaster />
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
