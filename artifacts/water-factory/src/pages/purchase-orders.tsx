@@ -242,7 +242,7 @@ export default function PurchaseOrdersPage() {
               <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">جاري التحميل...</TableCell></TableRow>
             ) : orders.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">لا توجد طلبات شراء</TableCell></TableRow>
-            ) : orders.map((order) => (
+            ) : orders.map((order: any) => (
               <TableRow key={order.id}>
                 <TableCell>{order.orderDate}</TableCell>
                 <TableCell><Badge variant="outline">{order.status ?? "pending"}</Badge></TableCell>

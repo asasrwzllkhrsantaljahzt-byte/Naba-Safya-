@@ -475,6 +475,7 @@ export default function PurchaseReturns() {
       accountId: p.accountId ? String(p.accountId) : "",
       warehouseId: p.warehouseId ? String(p.warehouseId) : "",
       notes: p.notes ?? "",
+      reasonForReturn: p.reasonForReturn ?? "",
     });
     setItems((p.items ?? []).map((it: any, idx: number) => ({
       rowId: `${it.productId}-edit-${idx}`,
