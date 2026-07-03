@@ -26,6 +26,31 @@ function formatReturn(p: typeof purchaseReturnsTable.$inferSelect) {
   };
 }
 
+function buildProcessedItems(items: Array<any>, products: Array<any>) {
+  let totalAmount = 0;
+  let vatAmount = 0;
+  const processedItems = (Array.isArray(items) ? items : []).map((item: { productId: number; quantity: number; unitPrice: number; vatRate?: number; vatEnabled?: boolean }) => {
+    const product = products.find((p: any) => p.id === item.productId);
+    const vatRate = item.vatRate ?? parseFloat(product?.vatRate ?? "15");
+    const vatEnabled = item.vatEnabled !== false;
+    const subtotal = item.quantity * item.unitPrice;
+    const itemVat = vatEnabled ? subtotal * (vatRate / 100) : 0;
+    totalAmount += subtotal;
+    vatAmount += itemVat;
+    return {
+      productId: item.productId,
+      productName: product?.name ?? `منتج #${item.productId}`,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      vatRate,
+      vatEnabled,
+      subtotal,
+    };
+  });
+  const grandTotal = totalAmount + vatAmount;
+  return { processedItems, totalAmount, vatAmount, grandTotal };
+}
+
 async function findHelperAccounts() {
   const allAccounts = await db.select().from(accountsTable);
   const purchasesAcc = allAccounts.find(a => a.name.includes("مردودات المشتريات"))
@@ -127,29 +152,7 @@ router.post("/purchase-returns", async (req, res) => {
     const method = paymentMethod ?? "cash";
 
     const products = await db.select().from(productsTable);
-
-    let totalAmount = 0;
-    let vatAmount = 0;
-    const processedItems = items.map((item: { productId: number; quantity: number; unitPrice: number; vatRate?: number; vatEnabled?: boolean }) => {
-      const product = products.find((p) => p.id === item.productId);
-      const vatRate = item.vatRate ?? parseFloat(product?.vatRate ?? "15");
-      const vatEnabled = item.vatEnabled !== false;
-      const subtotal = item.quantity * item.unitPrice;
-      const itemVat = vatEnabled ? subtotal * (vatRate / 100) : 0;
-      totalAmount += subtotal;
-      vatAmount += itemVat;
-      return {
-        productId: item.productId,
-        productName: product?.name ?? `منتج #${item.productId}`,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        vatRate,
-        vatEnabled,
-        subtotal,
-      };
-    });
-
-    const grandTotal = totalAmount + vatAmount;
+    const { processedItems, totalAmount, vatAmount, grandTotal } = buildProcessedItems(items, products);
 
     const [ret] = await db.insert(purchaseReturnsTable).values({
       returnNumber: returnNumber ?? `PRET-${Date.now()}`,
@@ -215,6 +218,36 @@ router.post("/purchase-returns", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "فشل في إضافة مرتجع الشراء" });
+  }
+});
+
+router.patch("/purchase-returns/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { date, originalPurchaseId, supplierName, supplierId, paymentMethod, accountId, warehouseId, notes, items } = req.body;
+    const products = await db.select().from(productsTable);
+    const { processedItems, totalAmount, vatAmount, grandTotal } = buildProcessedItems(items, products);
+
+    const [updated] = await db.update(purchaseReturnsTable).set({
+      date: date ?? undefined,
+      originalPurchaseId: originalPurchaseId ?? null,
+      supplierId: supplierId ?? null,
+      supplierName: supplierName ?? null,
+      paymentMethod: paymentMethod ?? undefined,
+      accountId: accountId ?? null,
+      warehouseId: warehouseId ?? null,
+      notes: notes ?? null,
+      items: processedItems,
+      totalAmount: String(totalAmount.toFixed(2)),
+      vatAmount: String(vatAmount.toFixed(2)),
+      grandTotal: String(grandTotal.toFixed(2)),
+    }).where(eq(purchaseReturnsTable.id, id)).returning();
+
+    if (!updated) return res.status(404).json({ error: "المرتجع غير موجود" });
+    return res.json(formatReturn(updated));
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "فشل في تحديث المرتجع" });
   }
 });
 

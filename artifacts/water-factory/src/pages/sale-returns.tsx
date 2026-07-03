@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Search, Printer } from "lucide-react";
+import { Plus, Trash2, Search, Printer, Edit } from "lucide-react";
 import { queryClient } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,6 +32,7 @@ export default function SaleReturns() {
   const [filterText, setFilterText] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [editId, setEditId] = useState<number | null>(null);
 
   const { data: returns = [], isLoading } = useQuery({
     queryKey: ["sale-returns"],
@@ -44,13 +45,19 @@ export default function SaleReturns() {
     }).then(async r => { if (!r.ok) throw new Error(); return r.json(); }),
   });
 
+  const updateReturn = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: any }) => fetch(`${BASE}/api/sale-returns/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }).then(async r => { if (!r.ok) throw new Error(); return r.json(); }),
+  });
+
   const deleteReturn = useMutation({
     mutationFn: (id: number) => fetch(`${BASE}/api/sale-returns/${id}`, { method: "DELETE" }),
   });
 
   const resetForm = () => {
     setForm(emptyForm); setItems([]); setLocked(false);
-    setOriginalSaleId(null); setOriginalSale(null);
+    setOriginalSaleId(null); setOriginalSale(null); setEditId(null);
   };
 
   // جلب بيانات فاتورة المبيعات برقم الطلبية
@@ -87,12 +94,36 @@ export default function SaleReturns() {
   const totalVat = activeItems.reduce((s, i) => s + (i.vatEnabled ? i.quantity * i.unitPrice * (i.vatRate / 100) : 0), 0);
   const grandTotal = subtotal + totalVat;
 
+  const openEdit = (returnItem: any) => {
+    setEditId(returnItem.id);
+    setForm({
+      date: returnItem.date,
+      orderNumber: returnItem.orderNumber ?? "",
+      notes: returnItem.notes ?? "",
+      reasonForReturn: returnItem.notes?.replace(/^سبب المرتجع:\s*/i, "") ?? "",
+    });
+    setOriginalSaleId(returnItem.originalSaleId ?? null);
+    setOriginalSale({ customerName: returnItem.customerName, paymentMethod: returnItem.paymentMethod, grandTotal: returnItem.grandTotal, customerId: returnItem.customerId, accountId: returnItem.accountId });
+    setItems((returnItem.items ?? []).map((it: any, idx: number) => ({
+      rowId: `${it.productId}-${idx}`,
+      productId: it.productId,
+      productName: it.productName ?? "",
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      vatEnabled: it.vatEnabled !== false,
+      vatRate: it.vatRate ?? 15,
+      originalQty: it.quantity,
+    })));
+    setLocked(true);
+    setIsOpen(true);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (activeItems.length === 0) { toast({ title: "يجب إدخال كمية أكبر من صفر لمنتج واحد على الأقل", variant: "destructive" }); return; }
     setSaving(true);
     try {
-      await createReturn.mutateAsync({
+      const payload = {
         date: form.date,
         originalSaleId,
         customerId: originalSale?.customerId ?? null,
@@ -101,8 +132,14 @@ export default function SaleReturns() {
         accountId: originalSale?.accountId ?? null,
         notes: form.reasonForReturn ? "سبب المرتجع: " + form.reasonForReturn + (form.notes ? " - " + form.notes : "") : form.notes,
         items: activeItems.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, vatRate: i.vatRate, vatEnabled: i.vatEnabled })),
-      });
-      toast({ title: "تم حفظ المرتجع وإنشاء القيد المحاسبي" });
+      };
+      if (editId) {
+        await updateReturn.mutateAsync({ id: editId, body: payload });
+        toast({ title: "تم تعديل المرتجع" });
+      } else {
+        await createReturn.mutateAsync(payload);
+        toast({ title: "تم حفظ المرتجع وإنشاء القيد المحاسبي" });
+      }
       setIsOpen(false);
       resetForm();
       queryClient.invalidateQueries({ queryKey: ["sale-returns"] });
@@ -266,9 +303,14 @@ export default function SaleReturns() {
                 <TableCell><Badge variant="outline">{paymentLabels[r.paymentMethod] ?? r.paymentMethod}</Badge></TableCell>
                 <TableCell className="font-bold text-red-600">-{Number(r.grandTotal || 0).toFixed(2)} ر.س</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" title="تعديل" onClick={() => openEdit(r)}>
+                      <Edit className="w-4 h-4 text-blue-600" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

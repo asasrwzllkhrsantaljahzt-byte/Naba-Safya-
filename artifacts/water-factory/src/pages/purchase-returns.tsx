@@ -381,6 +381,7 @@ export default function PurchaseReturns() {
   const [formData, setFormData] = useState(emptyFormData);
   const [items, setItems] = useState<ItemRow[]>([]);
   const [locked, setLocked] = useState(false);
+  const [editingReturnId, setEditingReturnId] = useState<number | null>(null);
   const [originalPurchaseId, setOriginalPurchaseId] = useState<number | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
 
@@ -456,6 +457,7 @@ export default function PurchaseReturns() {
     setFormData(emptyFormData);
     setItems([]);
     setEditId(null);
+    setEditingReturnId(null);
     setLocked(false);
     setOriginalPurchaseId(null);
   };
@@ -463,6 +465,7 @@ export default function PurchaseReturns() {
   // ✅ فتح فاتورة موجودة للتعديل
   const openEdit = (p: any) => {
     setEditId(p.id);
+    setEditingReturnId(p.id);
     setFormData({
       date: p.date,
       supplierName: p.supplierName ?? "",

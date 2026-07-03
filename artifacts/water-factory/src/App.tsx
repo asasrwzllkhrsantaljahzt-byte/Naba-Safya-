@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
 import Purchases from "@/pages/purchases";
 import Sales from "@/pages/sales";
+import PurchaseOrders from "@/pages/purchase-orders";
 import Customers from "@/pages/customers";
 import Reps from "@/pages/reps";
 import Inventory from "@/pages/inventory";
@@ -31,6 +32,7 @@ import Accounts from "@/pages/accounts";
 import Warehouses from "@/pages/warehouses";
 import PurchaseReturns from "@/pages/purchase-returns";
 import SaleReturns from "@/pages/sale-returns";
+import SaleOrders from "@/pages/sale-orders";
 import InventoryProducts from "@/pages/inventory-products";
 import Login from "@/pages/login";
 import Users from "@/pages/users";
@@ -107,10 +109,10 @@ function AdminRouter() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/purchases" component={Purchases} />
-        <Route path="/purchase-orders" component={Purchases} />
+        <Route path="/purchase-orders" component={PurchaseOrders} />
         <Route path="/suppliers" component={Suppliers} />
         <Route path="/sales" component={Sales} />
-        <Route path="/sale-orders" component={Sales} />
+        <Route path="/sale-orders" component={SaleOrders} />
         <Route path="/customers" component={Customers} />
         <Route path="/reps" component={Reps} />
         <Route path="/inventory" component={Inventory} />

@@ -26,6 +26,7 @@ import journalRouter from "./journal";
 import warehousesRouter from "./warehouses";
 import purchaseReturnsRouter from "./purchaseReturns";
 import saleReturnsRouter from "./saleReturns";
+import purchaseOrdersRouter from "./purchase-orders";
 
 const router: IRouter = Router();
 
@@ -54,6 +55,7 @@ router.use(repCustodyRouter);
 router.use(obligationsRouter);
 router.use(journalRouter);
 router.use(warehousesRouter);
+router.use(purchaseOrdersRouter);
 router.use(purchaseReturnsRouter);
 router.use(saleReturnsRouter);
 

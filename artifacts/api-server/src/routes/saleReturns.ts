@@ -16,10 +16,35 @@ function fmt(p: typeof saleReturnsTable.$inferSelect) {
   };
 }
 
+function buildItems(items: Array<any>, products: Array<any>) {
+  let totalAmount = 0;
+  let vatAmount = 0;
+  const processedItems = (Array.isArray(items) ? items : []).map((item: any) => {
+    const product = products.find((p: any) => p.id === item.productId);
+    const vatRate = item.vatRate ?? parseFloat(product?.vatRate ?? "15");
+    const vatEnabled = item.vatEnabled !== false;
+    const subtotal = item.quantity * item.unitPrice;
+    const itemVat = vatEnabled ? subtotal * (vatRate / 100) : 0;
+    totalAmount += subtotal;
+    vatAmount += itemVat;
+    return { productId: item.productId, productName: product?.name ?? "", quantity: item.quantity, unitPrice: item.unitPrice, vatRate, vatEnabled, subtotal };
+  });
+  const grandTotal = totalAmount + vatAmount;
+  return { processedItems, totalAmount, vatAmount, grandTotal };
+}
+
 router.get("/sale-returns", async (req, res) => {
   try {
     const returns = await db.select().from(saleReturnsTable).orderBy(saleReturnsTable.date);
-    return res.json(returns.map(fmt));
+    const result = await Promise.all(returns.map(async (ret) => {
+      const payload = fmt(ret);
+      if (ret.originalSaleId) {
+        const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, ret.originalSaleId));
+        return { ...payload, orderNumber: sale?.orderNumber ?? null };
+      }
+      return payload;
+    }));
+    return res.json(result);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "فشل في جلب مرتجعات المبيعات" });
@@ -30,18 +55,7 @@ router.post("/sale-returns", async (req, res) => {
   try {
     const { returnNumber, date, originalSaleId, customerName, customerId, paymentMethod, accountId, notes, items } = req.body;
     const products = await db.select().from(productsTable);
-    let totalAmount = 0, vatAmount = 0;
-    const processedItems = items.map((item: any) => {
-      const product = products.find((p) => p.id === item.productId);
-      const vatRate = item.vatRate ?? parseFloat(product?.vatRate ?? "15");
-      const vatEnabled = item.vatEnabled !== false;
-      const subtotal = item.quantity * item.unitPrice;
-      const itemVat = vatEnabled ? subtotal * (vatRate / 100) : 0;
-      totalAmount += subtotal;
-      vatAmount += itemVat;
-      return { productId: item.productId, productName: product?.name ?? "", quantity: item.quantity, unitPrice: item.unitPrice, vatRate, vatEnabled, subtotal };
-    });
-    const grandTotal = totalAmount + vatAmount;
+    const { processedItems, totalAmount, vatAmount, grandTotal } = buildItems(items, products);
 
     const [ret] = await db.insert(saleReturnsTable).values({
       returnNumber: returnNumber ?? "SRET-" + Date.now(),
@@ -103,6 +117,35 @@ router.post("/sale-returns", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "فشل في إضافة مرتجع المبيعات" });
+  }
+});
+
+router.patch("/sale-returns/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { date, originalSaleId, customerName, customerId, paymentMethod, accountId, notes, items } = req.body;
+    const products = await db.select().from(productsTable);
+    const { processedItems, totalAmount, vatAmount, grandTotal } = buildItems(items, products);
+
+    const [updated] = await db.update(saleReturnsTable).set({
+      date: date ?? undefined,
+      originalSaleId: originalSaleId ?? null,
+      customerId: customerId ?? null,
+      customerName: customerName ?? null,
+      paymentMethod: paymentMethod ?? undefined,
+      accountId: accountId ?? null,
+      notes,
+      items: processedItems,
+      totalAmount: String(totalAmount.toFixed(2)),
+      vatAmount: String(vatAmount.toFixed(2)),
+      grandTotal: String(grandTotal.toFixed(2)),
+    }).where(eq(saleReturnsTable.id, id)).returning();
+
+    if (!updated) return res.status(404).json({ error: "المرتجع غير موجود" });
+    return res.json(fmt(updated));
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "فشل في تحديث المرتجع" });
   }
 });
 
