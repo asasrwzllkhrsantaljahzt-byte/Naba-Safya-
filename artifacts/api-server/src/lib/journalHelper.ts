@@ -14,7 +14,7 @@ type CreateJournalEntryInput = {
   date: string;
   description: string;
   reference?: string | null;
-  source: "manual" | "sale" | "purchase" | "purchase_return" | "expense" | "treasury" | "payroll" | "obligation";
+  source: "manual" | "sale" | "purchase" | "purchase_return" | "sale_return" | "expense" | "treasury" | "payroll" | "obligation";
   referenceId?: number | null;
   lines: JournalLineInput[];
 };

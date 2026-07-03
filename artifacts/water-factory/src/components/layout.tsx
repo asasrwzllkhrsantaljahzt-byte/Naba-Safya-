@@ -74,6 +74,12 @@ type Notification = {
   amount?: number;
 };
 
+function formatNotificationDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" });
+}
+
 function NotificationPanel({ onClose }: { onClose: () => void }) {
   const [notes, setNotes] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,37 +87,55 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
     Promise.all([
-      fetch(`${BASE}/api/sales`).then(r => r.json()).catch(() => []),
-      fetch(`${BASE}/api/purchases`).then(r => r.json()).catch(() => []),
-      fetch(`${BASE}/api/expenses`).then(r => r.json()).catch(() => []),
-      fetch(`${BASE}/api/obligations`).then(r => r.json()).catch(() => []),
+      fetch(`${BASE}/api/sales`).then((r) => r.json()).catch(() => []),
+      fetch(`${BASE}/api/purchases`).then((r) => r.json()).catch(() => []),
+      fetch(`${BASE}/api/expenses`).then((r) => r.json()).catch(() => []),
+      fetch(`${BASE}/api/obligations`).then((r) => r.json()).catch(() => ({ records: [] })),
     ]).then(([sales, purchases, expenses, obligations]) => {
+      const obligationsList = Array.isArray(obligations)
+        ? obligations
+        : Array.isArray((obligations as any).records)
+          ? (obligations as any).records
+          : [];
       const result: Notification[] = [];
-      (sales as any[]).filter(s => s.date === today).forEach(s => result.push({
-        id: `sale-${s.id}`, type: "sale",
+
+      (sales as any[]).filter((s) => s.date === today).forEach((s) => result.push({
+        id: `sale-${s.id}`,
+        type: "sale",
         title: `فاتورة بيع - ${s.customerName}`,
-        desc: `${s.repName ?? ""} | ${s.orderNumber ?? ""}`,
-        time: s.date, amount: parseFloat(s.grandTotal),
+        desc: `${s.repName ?? ""}${s.repName && s.orderNumber ? " | " : ""}${s.orderNumber ?? ""}`,
+        time: s.createdAt ?? s.date,
+        amount: parseFloat(s.grandTotal),
       }));
-      (purchases as any[]).filter(p => p.date === today).forEach(p => result.push({
-        id: `pur-${p.id}`, type: "purchase",
+
+      (purchases as any[]).filter((p) => p.date === today).forEach((p) => result.push({
+        id: `pur-${p.id}`,
+        type: "purchase",
         title: `فاتورة شراء - ${p.supplierName ?? "مورد"}`,
         desc: p.invoiceNumber ?? "",
-        time: p.date, amount: parseFloat(p.grandTotal),
+        time: p.createdAt ?? p.date,
+        amount: parseFloat(p.grandTotal),
       }));
-      (expenses as any[]).filter(e => e.date === today).forEach(e => result.push({
-        id: `exp-${e.id}`, type: "expense",
+
+      (expenses as any[]).filter((e) => e.date === today).forEach((e) => result.push({
+        id: `exp-${e.id}`,
+        type: "expense",
         title: `مصروف - ${e.description}`,
         desc: e.category ?? "",
-        time: e.date, amount: parseFloat(e.amount),
+        time: e.createdAt ?? e.date,
+        amount: parseFloat(e.amount),
       }));
-      (Array.isArray(obligations) ? obligations : []).filter(o => o.dueDate === today && parseFloat(o.remainingAmount ?? o.totalAmount) > 0).forEach(o => result.push({
-        id: `obl-${o.id}`, type: "payment",
-        title: `التزام مستحق - ${o.supplierName}`,
-        desc: `المتبقي: ${parseFloat(o.remainingAmount ?? o.totalAmount).toFixed(2)} ر.س`,
-        time: o.dueDate,
-      }));
-      setNotes(result.sort((a, b) => b.id.localeCompare(a.id)));
+
+      obligationsList.filter((o: any) => o.dueDate === today && parseFloat(o.remainingAmount ?? o.amount ?? "0") > 0)
+        .forEach((o: any) => result.push({
+          id: `obl-${o.id}`,
+          type: "payment",
+          title: `التزام مستحق - ${o.partyName ?? o.supplierName ?? "طرف"}`,
+          desc: `المتبقي: ${parseFloat(o.remainingAmount ?? o.amount ?? "0").toFixed(2)} ر.س`,
+          time: o.createdAt ?? o.dueDate,
+        }));
+
+      setNotes(result.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
     }).finally(() => setLoading(false));
   }, []);
 
@@ -137,7 +161,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
             <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p>لا توجد أحداث اليوم</p>
           </div>
-        ) : notes.map(n => (
+        ) : notes.map((n) => (
           <div key={n.id} className="px-4 py-3 border-b last:border-0 hover:bg-muted/20 transition-colors">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
@@ -146,6 +170,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
                   <span className="text-sm font-medium truncate">{n.title}</span>
                 </div>
                 {n.desc && <p className="text-xs text-muted-foreground">{n.desc}</p>}
+                <p className="text-[11px] text-muted-foreground mt-1">{formatNotificationDate(n.time)}</p>
               </div>
               {n.amount !== undefined && (
                 <span className="text-sm font-bold text-primary shrink-0">{n.amount.toFixed(2)} ر.س</span>
@@ -187,18 +212,47 @@ export function Layout({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    Promise.all([
-      fetch(`${BASE}/api/sales`).then(r => r.json()).catch(() => []),
-      fetch(`${BASE}/api/purchases`).then(r => r.json()).catch(() => []),
-      fetch(`${BASE}/api/expenses`).then(r => r.json()).catch(() => []),
-    ]).then(([sales, purchases, expenses]) => {
-      const count =
-        (sales as any[]).filter(s => s.date === today).length +
-        (purchases as any[]).filter(p => p.date === today).length +
-        (expenses as any[]).filter(e => e.date === today).length;
-      setTodayCount(count);
-    }).catch(() => {});
+    let active = true;
+    const fetchTodayCount = async () => {
+      const today = new Date().toISOString().split("T")[0];
+      try {
+        const [salesRes, purchasesRes, expensesRes, obligationsRes] = await Promise.all([
+          fetch(`${BASE}/api/sales`).catch(() => new Response(JSON.stringify([])) as Response),
+          fetch(`${BASE}/api/purchases`).catch(() => new Response(JSON.stringify([])) as Response),
+          fetch(`${BASE}/api/expenses`).catch(() => new Response(JSON.stringify([])) as Response),
+          fetch(`${BASE}/api/obligations`).catch(() => new Response(JSON.stringify({ records: [] })) as Response),
+        ]);
+
+        const sales = await salesRes.json();
+        const purchases = await purchasesRes.json();
+        const expenses = await expensesRes.json();
+        const obligationsPayload = await obligationsRes.json();
+        const obligations = Array.isArray(obligationsPayload)
+          ? obligationsPayload
+          : Array.isArray(obligationsPayload.records)
+            ? obligationsPayload.records
+            : [];
+
+        if (!active) return;
+
+        const count =
+          (Array.isArray(sales) ? sales.filter((s: any) => s.date === today).length : 0) +
+          (Array.isArray(purchases) ? purchases.filter((p: any) => p.date === today).length : 0) +
+          (Array.isArray(expenses) ? expenses.filter((e: any) => e.date === today).length : 0) +
+          (Array.isArray(obligations) ? obligations.filter((o: any) => o.dueDate === today && parseFloat(o.remainingAmount ?? o.amount ?? "0") > 0).length : 0);
+
+        setTodayCount(count);
+      } catch {
+        // ignore count errors
+      }
+    };
+
+    fetchTodayCount();
+    const timer = window.setInterval(fetchTodayCount, 60000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [location]);
 
   return (

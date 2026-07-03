@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { salesTable, productsTable, customersTable, repsTable, inventoryTable, inventoryTransactionsTable, couponBooksTable, treasuryTransactionsTable, accountsTable } from "@workspace/db";
+import { salesTable, productsTable, customersTable, repsTable, inventoryTable, inventoryTransactionsTable, couponBooksTable, treasuryTransactionsTable, accountsTable, journalEntriesTable, journalLinesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { createJournalEntry } from "../lib/journalHelper";
 
@@ -355,6 +355,15 @@ router.patch("/sales/:id", async (req, res) => {
       });
     }
 
+    // remove old sale-related journal entries before creating new (in edits)
+    try {
+      const oldEntries = await db.select().from(journalEntriesTable).where(eq(journalEntriesTable.referenceId, sale.id));
+      for (const e of oldEntries) {
+        await db.delete(journalLinesTable).where(eq(journalLinesTable.entryId, e.id));
+        await db.delete(journalEntriesTable).where(eq(journalEntriesTable.id, e.id));
+      }
+    } catch (e) { req.log.error(e); }
+
     await createSaleJournalEntry({
       id: sale.id, date: sale.date, orderNumber: sale.orderNumber,
       totalAmount, vatAmount, grandTotal, paymentMethod, customerId, accountId: accountId ?? null,
@@ -370,6 +379,16 @@ router.patch("/sales/:id", async (req, res) => {
 router.delete("/sales/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, id));
+    if (sale) {
+      await db.delete(inventoryTransactionsTable).where(eq(inventoryTransactionsTable.reference, sale.orderNumber ?? `SAL-${sale.id}`));
+      await db.delete(treasuryTransactionsTable).where(eq(treasuryTransactionsTable.reference, sale.orderNumber ?? `SAL-${sale.id}`));
+      const entries = await db.select().from(journalEntriesTable).where(eq(journalEntriesTable.referenceId, sale.id));
+      for (const e of entries) {
+        await db.delete(journalLinesTable).where(eq(journalLinesTable.entryId, e.id));
+        await db.delete(journalEntriesTable).where(eq(journalEntriesTable.id, e.id));
+      }
+    }
     await db.delete(salesTable).where(eq(salesTable.id, id));
     return res.status(204).end();
   } catch (err) {

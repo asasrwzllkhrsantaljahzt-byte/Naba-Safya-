@@ -1,6 +1,6 @@
 import { pgTable, serial, text, numeric, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
 
-export const journalSourceEnum = pgEnum("journal_source", ["manual", "sale", "purchase", "expense", "treasury", "payroll", "obligation"]);
+export const journalSourceEnum = pgEnum("journal_source", ["manual", "sale", "purchase", "purchase_return", "sale_return", "expense", "treasury", "payroll", "obligation"]);
 
 export const journalEntriesTable = pgTable("journal_entries", {
   id: serial("id").primaryKey(),

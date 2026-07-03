@@ -1,6 +1,19 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
+import {
+  usersTable,
+  journalLinesTable,
+  journalEntriesTable,
+  treasuryTransactionsTable,
+  inventoryTransactionsTable,
+  saleReturnsTable,
+  salesTable,
+  purchaseReturnsTable,
+  purchasesTable,
+  expensesTable,
+  obligationsTable,
+  payrollTable,
+} from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -150,6 +163,41 @@ router.delete("/admin/users/:id", requireAdmin, async (req: any, res): Promise<a
     return res.status(204).end();
   } catch (err) {
     return res.status(500).json({ error: "فشل في حذف المستخدم" });
+  }
+});
+
+router.post("/admin/reset-factory", requireAdmin, async (req: any, res): Promise<any> => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: "أدخل كلمة مرور المشرف" });
+
+    const adminId = req.adminUser.userId;
+    const isDefaultAdmin = adminId === 999;
+
+    if (isDefaultAdmin) {
+      if (password !== "admin123") return res.status(401).json({ error: "كلمة المرور غير صحيحة" });
+    } else {
+      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, adminId));
+      if (!user || user.passwordHash !== hashPassword(password)) {
+        return res.status(401).json({ error: "كلمة المرور غير صحيحة" });
+      }
+    }
+
+    await db.delete(journalLinesTable).execute();
+    await db.delete(journalEntriesTable).execute();
+    await db.delete(treasuryTransactionsTable).execute();
+    await db.delete(inventoryTransactionsTable).execute();
+    await db.delete(saleReturnsTable).execute();
+    await db.delete(salesTable).execute();
+    await db.delete(purchaseReturnsTable).execute();
+    await db.delete(purchasesTable).execute();
+    await db.delete(expensesTable).execute();
+    await db.delete(obligationsTable).execute();
+    await db.delete(payrollTable).execute();
+
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: "فشل في إعادة ضبط المصنع" });
   }
 });
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { expensesTable, treasuryTransactionsTable } from "@workspace/db";
+import { expensesTable, treasuryTransactionsTable, accountsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const EXPENSE_CATEGORIES = [
@@ -54,6 +54,28 @@ router.post("/expenses", async (req, res) => {
       source: "expense",
       reference: `EXP-${expense.id}`,
     });
+
+    // Create journal entry: debit expense account, credit cash/bank
+    try {
+      const allAccounts = await db.select().from(accountsTable);
+      const expenseAcc = allAccounts.find(a => a.name.includes(category) || a.type === 'expense');
+      const cashAcc = allAccounts.find(a => a.code === '1001' || a.name.includes('خزينة') || a.name.includes('البنك'));
+      if (expenseAcc && cashAcc) {
+        await import('../lib/journalHelper').then(m => m.createJournalEntry({
+          date: expense.date,
+          description: `مصروف ${description} (${category})`,
+          reference: `EXP-${expense.id}`,
+          source: 'expense',
+          referenceId: expense.id,
+          lines: [
+            { accountId: expenseAcc.id, accountName: expenseAcc.name, accountCode: expenseAcc.code, debit: String(parseFloat(String(amount)).toFixed(2)), credit: '0' },
+            { accountId: cashAcc.id, accountName: cashAcc.name, accountCode: cashAcc.code, debit: '0', credit: String(parseFloat(String(amount)).toFixed(2)) },
+          ]
+        }));
+      }
+    } catch (e) {
+      req.log.error(e);
+    }
 
     return res.status(201).json({ ...expense, amount: parseFloat(expense.amount), createdAt: expense.createdAt.toISOString() });
   } catch (err) {

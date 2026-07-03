@@ -4,9 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, CreditCard, Download, Database, CheckCircle, Package, ExternalLink } from "lucide-react";
-import { Link } from "wouter";
+import { Building2, CreditCard, Download, Database, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -25,15 +25,6 @@ type FactorySettings = {
   logoUrl: string;
 };
 
-type Product = {
-  id: number;
-  name: string;
-  color: string;
-  unitPrice: number;
-  vatRate: number;
-  description?: string | null;
-};
-
 const defaultSettings: Omit<FactorySettings, "id"> = {
   companyName: "",
   vatNumber: "",
@@ -48,21 +39,16 @@ const defaultSettings: Omit<FactorySettings, "id"> = {
   logoUrl: "",
 };
 
-const emptyProduct = { name: "", color: "blue", unitPrice: "", vatRate: "15", description: "" };
-
 export default function Settings() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Omit<FactorySettings, "id">>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
-
-  // Products state
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [productDialog, setProductDialog] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productForm, setProductForm] = useState(emptyProduct);
+  const { user, token } = useAuth();
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API}/api/settings`)
@@ -84,18 +70,7 @@ export default function Settings() {
       })
       .catch(() => toast({ title: "خطأ", description: "فشل في جلب الإعدادات", variant: "destructive" }))
       .finally(() => setIsLoading(false));
-
-    loadProducts();
   }, []);
-
-  const loadProducts = () => {
-    setProductsLoading(true);
-    fetch(`${API}/api/products`)
-      .then(r => r.json())
-      .then(setProducts)
-      .catch(() => toast({ title: "خطأ", description: "فشل في جلب المنتجات", variant: "destructive" }))
-      .finally(() => setProductsLoading(false));
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -134,64 +109,38 @@ export default function Settings() {
     }
   };
 
-  const openAddProduct = () => {
-    setEditingProduct(null);
-    setProductForm(emptyProduct);
-    setProductDialog(true);
-  };
 
-  const openEditProduct = (p: Product) => {
-    setEditingProduct(p);
-    setProductForm({ name: p.name, color: p.color, unitPrice: String(p.unitPrice), vatRate: String(p.vatRate), description: p.description ?? "" });
-    setProductDialog(true);
-  };
-
-  const handleSaveProduct = async () => {
-    if (!productForm.name.trim()) { toast({ title: "خطأ", description: "اسم المنتج مطلوب", variant: "destructive" }); return; }
-    if (!productForm.unitPrice) { toast({ title: "خطأ", description: "السعر مطلوب", variant: "destructive" }); return; }
-
-    const body = {
-      name: productForm.name,
-      color: productForm.color,
-      unitPrice: parseFloat(productForm.unitPrice),
-      vatRate: parseFloat(productForm.vatRate),
-      description: productForm.description || null,
-    };
-
-    try {
-      if (editingProduct) {
-        const res = await fetch(`${API}/api/products/${editingProduct.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error();
-        toast({ title: "تم التعديل", description: "تم تعديل المنتج بنجاح" });
-      } else {
-        const res = await fetch(`${API}/api/products`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error();
-        toast({ title: "تمت الإضافة", description: "تم إضافة المنتج بنجاح" });
-      }
-      setProductDialog(false);
-      loadProducts();
-    } catch {
-      toast({ title: "خطأ", description: "فشل في حفظ المنتج", variant: "destructive" });
+  const handleFactoryReset = async () => {
+    if (!user || user.role !== "admin") {
+      setResetMessage("هذه الميزة متاحة فقط للمشرفين.");
+      return;
     }
-  };
+    if (!resetPassword) {
+      setResetMessage("أدخل كلمة مرور المشرف قبل حذف البيانات.");
+      return;
+    }
 
-  const handleDeleteProduct = async (id: number) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+    setResetLoading(true);
+    setResetMessage(null);
     try {
-      const res = await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      toast({ title: "تم الحذف", description: "تم حذف المنتج بنجاح" });
-      loadProducts();
-    } catch {
-      toast({ title: "خطأ", description: "فشل في حذف المنتج", variant: "destructive" });
+      const res = await fetch(`${API}/api/admin/reset-factory`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ password: resetPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "فشل في حذف البيانات");
+      }
+      setResetMessage("تمت إعادة ضبط المصنع وحذف البيانات بنجاح.");
+      setResetPassword("");
+    } catch (err) {
+      setResetMessage(err instanceof Error ? err.message : "فشل في حذف البيانات");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -213,11 +162,11 @@ export default function Settings() {
       <Tabs defaultValue="factory">
         <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent mb-6 flex-wrap">
           <TabsTrigger
-            value="products"
+            value="reset"
             className="data-[state=active]:border-primary data-[state=active]:bg-transparent border-b-2 border-transparent rounded-none px-6 py-3"
           >
-            <Package className="w-4 h-4 ml-2" />
-            المنتجات
+            <Database className="w-4 h-4 ml-2" />
+            حذف جميع البيانات
           </TabsTrigger>
           <TabsTrigger
             value="factory"
@@ -242,30 +191,47 @@ export default function Settings() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ===== PRODUCTS TAB (redirect) ===== */}
-        <TabsContent value="products" className="mt-0">
+        {/* ===== RESET TAB ===== */}
+        <TabsContent value="reset" className="mt-0">
           <Card>
             <CardHeader>
-              <CardTitle>إدارة المنتجات</CardTitle>
-              <CardDescription>تم نقل إدارة المنتجات إلى قسم المخزن</CardDescription>
+              <CardTitle>حذف جميع البيانات</CardTitle>
+              <CardDescription>تنفيذ إعادة ضبط المصنع لمسح بيانات التشغيل دون تغيير إعدادات المستخدم الأساسية.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <Package className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">تم نقل إدارة المنتجات</h3>
-                  <p className="text-muted-foreground text-sm max-w-xs">
-                    يمكنك الآن إدارة المنتجات من قسم <strong>المخزن ← المنتجات</strong> في الشريط الجانبي
-                  </p>
-                </div>
-                <Link href="/inventory/products">
-                  <Button className="flex items-center gap-2">
-                    <ExternalLink className="w-4 h-4" />
-                    الذهاب إلى إدارة المنتجات
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <p className="text-base font-semibold text-destructive">إعادة ضبط المصنع</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  سيؤدي هذا إلى حذف بيانات التشغيل الأساسية للنظام، مثل المبيعات، المشتريات، المصروفات، الحركات المخزنية، القيود المحاسبية، والالتزامات.
+                  تبقى إعدادات المصنع الأساسية والمستخدمون.
+                </p>
+
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-muted-foreground">كلمة مرور المشرف</label>
+                    <Input
+                      type="password"
+                      placeholder="أدخل كلمة مرور المشرف لتأكيد الحذف"
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                      disabled={resetLoading}
+                    />
+                  </div>
+                  {resetMessage && (
+                    <p className="text-sm text-destructive">{resetMessage}</p>
+                  )}
+                  <Button
+                    onClick={handleFactoryReset}
+                    disabled={resetLoading || !user || user.role !== "admin"}
+                    className="w-full"
+                    variant="destructive"
+                  >
+                    {resetLoading ? "جاري الحذف..." : "حذف البيانات وإعادة ضبط المصنع"}
                   </Button>
-                </Link>
+                  {!user || user.role !== "admin" ? (
+                    <p className="text-sm text-muted-foreground">هذه الميزة متاحة لمستخدمي المشرف فقط.</p>
+                  ) : null}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -349,7 +315,7 @@ export default function Settings() {
                 <p className="text-sm font-medium">ماذا تشمل النسخة الاحتياطية؟</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {[
-                    "إعدادات المصنع", "المنتجات", "العملاء", "الموردين", "المندوبين",
+                    "إعدادات المصنع", "العملاء", "الموردين", "المندوبين",
                     "فواتير المبيعات والمشتريات", "المخزن وحركاته",
                     "المصروفات والخزينة", "الموظفين والرواتب",
                     "التكاليف التشغيلية والالتزامات",

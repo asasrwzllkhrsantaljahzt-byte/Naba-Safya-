@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { purchasesTable, productsTable, inventoryTable, inventoryTransactionsTable, treasuryTransactionsTable, accountsTable, suppliersTable } from "@workspace/db";
+import { purchasesTable, productsTable, inventoryTable, inventoryTransactionsTable, treasuryTransactionsTable, accountsTable, suppliersTable, journalEntriesTable, journalLinesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { createJournalEntry } from "../lib/journalHelper";
 
@@ -254,6 +254,17 @@ router.patch("/purchases/:id", async (req, res) => {
     // حذف حركة الخزينة القديمة المرتبطة
     await db.delete(treasuryTransactionsTable).where(eq(treasuryTransactionsTable.reference, oldPurchase.invoiceNumber ?? `PUR-${oldPurchase.id}`));
 
+    // حذف القيود المحاسبية القديمة المرتبطة بالفاتورة
+    try {
+      const oldEntries = await db.select().from(journalEntriesTable).where(eq(journalEntriesTable.referenceId, oldPurchase.id));
+      for (const e of oldEntries) {
+        await db.delete(journalLinesTable).where(eq(journalLinesTable.entryId, e.id));
+        await db.delete(journalEntriesTable).where(eq(journalEntriesTable.id, e.id));
+      }
+    } catch (e) {
+      req.log.error(e);
+    }
+
     // إعادة حساب البنود الجديدة
     const products = await db.select().from(productsTable);
     let totalAmount = 0;
@@ -358,6 +369,19 @@ router.get("/purchases/:id", async (req, res) => {
 router.delete("/purchases/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [purchase] = await db.select().from(purchasesTable).where(eq(purchasesTable.id, id));
+    if (purchase) {
+      // delete related inventory transactions
+      await db.delete(inventoryTransactionsTable).where(eq(inventoryTransactionsTable.reference, purchase.invoiceNumber ?? `PUR-${purchase.id}`));
+      // delete related treasury transactions
+      await db.delete(treasuryTransactionsTable).where(eq(treasuryTransactionsTable.reference, purchase.invoiceNumber ?? `PUR-${purchase.id}`));
+      // delete linked journal entries
+      const entries = await db.select().from(journalEntriesTable).where(eq(journalEntriesTable.referenceId, purchase.id));
+      for (const e of entries) {
+        await db.delete(journalLinesTable).where(eq(journalLinesTable.entryId, e.id));
+        await db.delete(journalEntriesTable).where(eq(journalEntriesTable.id, e.id));
+      }
+    }
     await db.delete(purchasesTable).where(eq(purchasesTable.id, id));
     return res.status(204).end();
   } catch (err) {

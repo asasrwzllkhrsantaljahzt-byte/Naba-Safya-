@@ -92,6 +92,12 @@ router.post("/journal", async (req, res) => {
 router.delete("/journal/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const [entry] = await db.select().from(journalEntriesTable).where(eq(journalEntriesTable.id, id));
+    if (!entry) return res.status(404).json({ error: "القيد غير موجود" });
+    // Allow deletion only for manual entries
+    if (entry.source !== 'manual') {
+      return res.status(400).json({ error: 'لا يمكن حذف القيود المُولدة تلقائياً من الفواتير' });
+    }
     await db.delete(journalLinesTable).where(eq(journalLinesTable.entryId, id));
     await db.delete(journalEntriesTable).where(eq(journalEntriesTable.id, id));
     return res.json({ success: true });
