@@ -18,3 +18,7 @@ export * from "./obligations";
 export * from "./operationalCosts";
 export * from "./settings";
 export * from "./users";
+export * from "./journal";
+export * from "./warehouses";
+export * from "./purchaseReturns";
+export * from "./saleReturns";

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useListPurchases, useCreatePurchase, useDeletePurchase, useListProducts, getListPurchasesQueryKey, PurchaseItemInput } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -29,7 +28,7 @@ function formatDateRTL(dateStr: string) {
 }
 
 // ✅ طباعة الفاتورة — بدون رقم ضريبي، نسبة ضريبة صحيحة، تاريخ rtl
-function printPurchaseInvoice(purchase: any) {
+function printPurchaseReturnInvoice(purchase: any) {
   const items = Array.isArray(purchase.items) ? purchase.items : [];
   const w = window.open("", "_blank", "width=800,height=700");
   if (!w) return;
@@ -46,11 +45,11 @@ function printPurchaseInvoice(purchase: any) {
   const vatAmount = Number(purchase.vatAmount ?? 0).toFixed(2);
   const payLabel = paymentLabels[purchase.paymentMethod]?.label ?? purchase.paymentMethod ?? "نقدي";
   w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"/>
-    <title>فاتورة شراء ${purchase.invoiceNumber ?? ""}</title>
+    <title>مرتجع فاتورة شراء ${purchase.invoiceNumber ?? ""}</title>
     <style>body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;padding:32px;color:#111;font-size:14px;max-width:800px;margin:auto}.header{text-align:center;border-bottom:2px solid #16a34a;padding-bottom:16px;margin-bottom:20px}.header h1{font-size:22px;margin:0 0 4px 0;color:#16a34a}.header p{margin:2px 0;color:#555}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}.info-box{border:1px solid #e5e7eb;border-radius:6px;padding:12px}.info-box label{font-size:11px;color:#888;display:block;margin-bottom:3px}.info-box span{font-weight:bold;font-size:14px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#16a34a;color:white;padding:10px 12px;font-size:13px}td{padding:9px 12px;border-bottom:1px solid #e5e7eb}.totals{border:1px solid #e5e7eb;border-radius:8px;padding:16px;background:#f8fafc}.total-row{display:flex;justify-content:space-between;padding:6px 0}.total-row.grand{border-top:2px solid #16a34a;margin-top:8px;padding-top:12px;font-size:18px;color:#16a34a;font-weight:bold}.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;background:#dcfce7;color:#16a34a}.footer{margin-top:32px;border-top:1px solid #e5e7eb;padding-top:16px;text-align:center;color:#888;font-size:12px}@media print{body{padding:16px}}</style>
     </head><body>
     <div class="header"><h1>${COMPANY_NAME}</h1>
-    <p style="font-size:18px;font-weight:bold;margin-top:10px;">فاتورة شراء</p>
+    <p style="font-size:18px;font-weight:bold;margin-top:10px;">مرتجع فاتورة شراء</p>
     ${purchase.invoiceNumber ? `<p style="font-size:13px;color:#16a34a;">رقم الفاتورة: ${purchase.invoiceNumber}</p>` : ""}</div>
     <div class="info-grid">
       <div class="info-box"><label>المورد</label><span>${purchase.supplierName ?? "-"}</span></div>
@@ -65,7 +64,7 @@ function printPurchaseInvoice(purchase: any) {
       <div class="total-row"><span>ضريبة القيمة المضافة</span><span>${vatAmount} ر.س</span></div>
       <div class="total-row grand"><span>الإجمالي شامل الضريبة</span><span>${grandTotal} ر.س</span></div>
     </div>
-    <div class="footer"><p>فاتورة شراء صادرة عن ${COMPANY_NAME}</p></div>
+    <div class="footer"><p>مرتجع فاتورة شراء صادرة عن ${COMPANY_NAME}</p></div>
     </body></html>`);
   w.document.close();
   setTimeout(() => { w.focus(); w.print(); }, 400);
@@ -319,27 +318,39 @@ function CreateProductDialog({ open, defaultName, onClose, onCreated }: {
   );
 }
 
-// ── Main Purchases Page ────────────────────────────────────────────────
+// ── Main PurchaseReturns Page ────────────────────────────────────────────────
 type ItemRow = { rowId: string; productId: number; quantity: number; unitPrice: number; vatEnabled: boolean; vatRate: number };
 
 const emptyFormData = {
   date: new Date().toISOString().split('T')[0],
-  supplierName: "", supplierId: "", invoiceNumber: "", paymentMethod: "cash", accountId: "", warehouseId: "", notes: "",
+  supplierName: "", supplierId: "", invoiceNumber: "", paymentMethod: "cash", accountId: "", warehouseId: "", notes: "", reasonForReturn: "",
 };
 
-export default function Purchases() {
+export default function PurchaseReturns() {
   const { toast } = useToast();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [filterSupplier, setFilterSupplier] = useState("");
   const [filterPayment, setFilterPayment] = useState("");
 
-  const { data: purchases = [], isLoading } = useListPurchases();
-  const { data: productsResponse, refetch: refetchProducts } = useListProducts();
+  const { data: purchases = [], isLoading } = useQuery({
+    queryKey: ["purchase-returns"],
+    queryFn: () => fetch(`${BASE}/api/purchase-returns`).then(r => r.json()),
+  });
+  const { data: productsResponse, refetch: refetchProducts } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => fetch(`${BASE}/api/products`).then(r => r.json()),
+  });
   const products = Array.isArray(productsResponse) ? productsResponse : Array.isArray((productsResponse as any)?.data) ? (productsResponse as any).data : [];
 
-  const createPurchase = useCreatePurchase();
-  const deletePurchase = useDeletePurchase();
+  const createPurchase = useMutation({
+    mutationFn: (body: any) => fetch(`${BASE}/api/purchase-returns`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body.data),
+    }).then(r => r.json()),
+  });
+  const deletePurchase = useMutation({
+    mutationFn: (vars: { id: number }) => fetch(`${BASE}/api/purchase-returns/${vars.id}`, { method: "DELETE" }),
+  });
 
   const [isOpen, setIsOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -369,6 +380,50 @@ export default function Purchases() {
 
   const [formData, setFormData] = useState(emptyFormData);
   const [items, setItems] = useState<ItemRow[]>([]);
+  const [locked, setLocked] = useState(false);
+  const [originalPurchaseId, setOriginalPurchaseId] = useState<number | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+
+  // ✅ جلب بيانات الفاتورة الأصلية برقم الفاتورة وقفل كل الحقول إلا الكمية
+  const lookupInvoice = async () => {
+    const num = formData.invoiceNumber.trim();
+    if (!num) return;
+    setLookupLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/purchases`);
+      const list = await res.json();
+      const all = Array.isArray(list) ? list : Array.isArray(list?.data) ? list.data : [];
+      const match = all.find((p: any) => String(p.invoiceNumber) === num);
+      if (!match) {
+        toast({ title: "لم يتم العثور على فاتورة بهذا الرقم", variant: "destructive" });
+        return;
+      }
+      setOriginalPurchaseId(match.id);
+      setFormData(f => ({
+        ...f,
+        date: match.date,
+        supplierName: match.supplierName ?? "",
+        supplierId: match.supplierId ? String(match.supplierId) : "",
+        paymentMethod: match.paymentMethod ?? "cash",
+        accountId: match.accountId ? String(match.accountId) : "",
+        warehouseId: match.warehouseId ? String(match.warehouseId) : "",
+      }));
+      setItems((match.items ?? []).map((it: any, idx: number) => ({
+        rowId: `${it.productId}-orig-${idx}`,
+        productId: it.productId,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        vatEnabled: it.vatEnabled !== false,
+        vatRate: it.vatRate ?? 15,
+      })));
+      setLocked(true);
+      toast({ title: "تم جلب بيانات الفاتورة — يمكنك تعديل الكمية فقط" });
+    } catch {
+      toast({ title: "خطأ في جلب بيانات الفاتورة", variant: "destructive" });
+    } finally {
+      setLookupLoading(false);
+    }
+  };
 
   // ✅ السماح بإضافة نفس المنتج أكتر من مرة — rowId فريد بدل productId
   const handleAddItem = (productId: number) => {
@@ -401,6 +456,8 @@ export default function Purchases() {
     setFormData(emptyFormData);
     setItems([]);
     setEditId(null);
+    setLocked(false);
+    setOriginalPurchaseId(null);
   };
 
   // ✅ فتح فاتورة موجودة للتعديل
@@ -429,7 +486,8 @@ export default function Purchases() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) { toast({ title: "الرجاء إضافة منتج واحد على الأقل", variant: "destructive" }); return; }
+    const activeItemsForSubmit = items.filter(i => i.quantity > 0);
+    if (activeItemsForSubmit.length === 0) { toast({ title: "الرجاء إضافة منتج واحد على الأقل بكمية أكبر من صفر", variant: "destructive" }); return; }
     if (formData.paymentMethod !== "credit" && !formData.accountId) {
       toast({ title: "يرجى اختيار الحساب (خزينة أو بنك)", variant: "destructive" }); return;
     }
@@ -441,10 +499,12 @@ export default function Purchases() {
 
     const payload = {
       ...formData,
+      originalPurchaseId,
       supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
       accountId: formData.accountId ? parseInt(formData.accountId) : null,
       warehouseId: formData.warehouseId ? parseInt(formData.warehouseId) : null,
-      items: items.map(i => ({
+      notes: formData.reasonForReturn ? `${formData.notes ? formData.notes + " - " : ""}سبب المرتجع: ${formData.reasonForReturn}` : formData.notes,
+      items: activeItemsForSubmit.map(i => ({
         productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice,
         vatRate: i.vatRate, vatEnabled: i.vatEnabled,
       })),
@@ -452,7 +512,7 @@ export default function Purchases() {
 
     try {
       if (editId) {
-        const r = await fetch(`${BASE}/api/purchases/${editId}`, {
+        const r = await fetch(`${BASE}/api/purchase-returns/${editId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         });
         if (!r.ok) throw new Error();
@@ -463,11 +523,11 @@ export default function Purchases() {
       }
       setIsOpen(false);
       resetForm();
-      queryClient.invalidateQueries({ queryKey: getListPurchasesQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["purchase-returns"] });
       queryClient.invalidateQueries({ queryKey: ["treasury"] });
       queryClient.invalidateQueries({ queryKey: ["journal"] });
     } catch {
-      toast({ title: "فشل في حفظ الفاتورة", variant: "destructive" });
+      toast({ title: "فشل في حفظ المرتجع", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -476,13 +536,13 @@ export default function Purchases() {
   const handleDelete = async (id: number) => {
     if (confirm("هل أنت متأكد من الحذف؟")) {
       await deletePurchase.mutateAsync({ id });
-      queryClient.invalidateQueries({ queryKey: getListPurchasesQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["purchase-returns"] });
     }
   };
 
-  const safePurchases = Array.isArray(purchases) ? purchases : Array.isArray((purchases as any)?.data) ? (purchases as any).data : [];
+  const safePurchaseReturns = Array.isArray(purchases) ? purchases : Array.isArray((purchases as any)?.data) ? (purchases as any).data : [];
 
-  const filtered = safePurchases.filter((p: any) => {
+  const filtered = safePurchaseReturns.filter((p: any) => {
     if (from && p.date < from) return false;
     if (to && p.date > to) return false;
     if (filterSupplier && !p.supplierName?.includes(filterSupplier)) return false;
@@ -491,21 +551,22 @@ export default function Purchases() {
   });
   const total = filtered.reduce((s: number, p: any) => s + (p.grandTotal || 0), 0);
 
-  const subtotalBeforeVat = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-  const totalVat = items.reduce((s, i) => s + (i.vatEnabled ? i.quantity * i.unitPrice * (i.vatRate / 100) : 0), 0);
+  const activeItems = items.filter(i => i.quantity > 0);
+  const subtotalBeforeVat = activeItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  const totalVat = activeItems.reduce((s, i) => s + (i.vatEnabled ? i.quantity * i.unitPrice * (i.vatRate / 100) : 0), 0);
   const grandTotal = subtotalBeforeVat + totalVat;
 
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">فواتير المشتريات</h1>
+          <h1 className="text-2xl font-bold">مرتجعات المشتريات</h1>
           <p className="text-sm text-muted-foreground mt-1">الإجمالي: <span className="font-bold text-foreground">{total.toLocaleString()} ر.س</span> ({filtered.length} فاتورة)</p>
         </div>
         <Dialog open={isOpen} onOpenChange={v => { setIsOpen(v); if (!v) resetForm(); }}>
-          <DialogTrigger asChild><Button onClick={() => resetForm()}><Plus className="ml-2 w-4 h-4" /> إضافة فاتورة</Button></DialogTrigger>
+          <DialogTrigger asChild><Button onClick={() => resetForm()}><Plus className="ml-2 w-4 h-4" /> إضافة مرتجع</Button></DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editId ? "تعديل فاتورة شراء" : "إضافة فاتورة شراء جديدة"}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editId ? "تعديل مرتجع فاتورة شراء" : "مرتجع فاتورة مشتريات"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -513,16 +574,30 @@ export default function Purchases() {
                   <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">رقم الفاتورة</label>
-                  <Input value={formData.invoiceNumber} onChange={e => setFormData({ ...formData, invoiceNumber: e.target.value })} />
+                  <label className="text-sm font-medium">رقم الفاتورة <span className="text-xs text-muted-foreground font-normal">(اكتب الرقم واضغط Enter لجلب البيانات)</span></label>
+                  <Input
+                    value={formData.invoiceNumber}
+                    onChange={e => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); lookupInvoice(); } }}
+                    disabled={locked || lookupLoading}
+                    placeholder="رقم الفاتورة الأصلية..."
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <label className="text-sm font-medium">سبب المرتجع</label>
+                  <Input value={formData.reasonForReturn} onChange={e => setFormData({ ...formData, reasonForReturn: e.target.value })} placeholder="مثال: عيب في المنتج، كمية زائدة..." />
                 </div>
                 <div className="space-y-2 col-span-2">
                   <label className="text-sm font-medium">المورد</label>
-                  <SupplierCombobox value={formData.supplierId} onChange={handleSupplierSelect} suppliers={suppliers as any[]} onCreateNew={handleCreateSupplier} />
+                  {locked ? (
+                    <Input value={formData.supplierName} disabled className="bg-muted" />
+                  ) : (
+                    <SupplierCombobox value={formData.supplierId} onChange={handleSupplierSelect} suppliers={suppliers as any[]} onCreateNew={handleCreateSupplier} />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">طريقة الدفع</label>
-                  <Select value={formData.paymentMethod} onValueChange={v => setFormData({ ...formData, paymentMethod: v, accountId: "" })}>
+                  <Select disabled={locked} value={formData.paymentMethod} onValueChange={v => setFormData({ ...formData, paymentMethod: v, accountId: "" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">نقدي (خزينة)</SelectItem>
@@ -536,25 +611,33 @@ export default function Purchases() {
                 {formData.paymentMethod !== "credit" && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">الحساب <span className="text-red-500">*</span></label>
-                    <Select value={formData.accountId} onValueChange={v => setFormData({ ...formData, accountId: v })}>
-                      <SelectTrigger><SelectValue placeholder="اختر الحساب..." /></SelectTrigger>
-                      <SelectContent>
-                        {formData.paymentMethod === "cash" ? (
-                          cashAccounts.length > 0 ? cashAccounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)
-                            : <div className="px-3 py-2 text-xs text-muted-foreground">أضف خزينة في دليل الحسابات</div>
-                        ) : (
-                          bankAccounts.length > 0 ? bankAccounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)
-                            : <div className="px-3 py-2 text-xs text-muted-foreground">أضف بنك في دليل الحسابات</div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    {locked ? (
+                      <Input
+                        value={(formData.paymentMethod === "cash" ? cashAccounts : bankAccounts).find((a: any) => String(a.id) === formData.accountId)?.name ?? "..."}
+                        disabled
+                        className="bg-muted"
+                      />
+                    ) : (
+                      <Select value={formData.accountId} onValueChange={v => setFormData({ ...formData, accountId: v })}>
+                        <SelectTrigger><SelectValue placeholder="اختر الحساب..." /></SelectTrigger>
+                        <SelectContent>
+                          {formData.paymentMethod === "cash" ? (
+                            cashAccounts.length > 0 ? cashAccounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)
+                              : <div className="px-3 py-2 text-xs text-muted-foreground">أضف خزينة في دليل الحسابات</div>
+                          ) : (
+                            bankAccounts.length > 0 ? bankAccounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)
+                              : <div className="px-3 py-2 text-xs text-muted-foreground">أضف بنك في دليل الحسابات</div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 )}
 
                 {/* ✅ اختيار المخزن */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">المخزن</label>
-                  <Select value={formData.warehouseId} onValueChange={v => setFormData({ ...formData, warehouseId: v })}>
+                  <Select disabled={locked} value={formData.warehouseId} onValueChange={v => setFormData({ ...formData, warehouseId: v })}>
                     <SelectTrigger><SelectValue placeholder="اختر المخزن..." /></SelectTrigger>
                     <SelectContent>
                       {(warehouses as any[]).map(w => <SelectItem key={w.id} value={String(w.id)}>{w.name}</SelectItem>)}
@@ -566,8 +649,8 @@ export default function Purchases() {
               {/* Products */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">المنتجات</h3>
-                  <ProductCombobox products={products as any[]} onAdd={handleAddItem} onCreate={handleCreateProduct} />
+                  <h3 className="font-semibold text-sm">المنتجات {locked && <span className="text-xs text-muted-foreground font-normal">(الكمية فقط قابلة للتعديل)</span>}</h3>
+                  {!locked && <ProductCombobox products={products as any[]} onAdd={handleAddItem} onCreate={handleCreateProduct} />}
                 </div>
                 {items.length > 0 ? (
                   <div className="border rounded-lg overflow-hidden">
@@ -582,19 +665,21 @@ export default function Purchases() {
                             <div className="flex-1 font-medium text-sm">{product?.name}</div>
                             <div className="w-20">
                               <label className="text-xs text-muted-foreground block mb-1">الكمية</label>
-                              <Input type="number" min="1" value={item.quantity} onChange={e => updateItem(item.rowId, 'quantity', Number(e.target.value))} className="h-8 text-center" />
+                              <Input type="number" min="0" value={item.quantity} onChange={e => updateItem(item.rowId, 'quantity', Number(e.target.value))} className="h-8 text-center" />
                             </div>
                             <div className="w-28">
                               <label className="text-xs text-muted-foreground block mb-1">سعر الوحدة</label>
-                              <Input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(item.rowId, 'unitPrice', Number(e.target.value))} className="h-8" />
+                              <Input type="number" min="0" step="0.01" value={item.unitPrice} disabled={locked} onChange={e => updateItem(item.rowId, 'unitPrice', Number(e.target.value))} className="h-8" />
                             </div>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(item.rowId)}>
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
+                            {!locked && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(item.rowId)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            )}
                           </div>
                           <div className="flex items-center justify-between gap-3 text-xs bg-muted/30 rounded-md px-3 py-2">
                             <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
-                              <input type="checkbox" checked={item.vatEnabled}
+                              <input type="checkbox" checked={item.vatEnabled} disabled={locked}
                                 onChange={e => updateItem(item.rowId, 'vatEnabled', e.target.checked)}
                                 className="w-3.5 h-3.5 accent-primary cursor-pointer" />
                               <span className="text-muted-foreground">ضريبة ({item.vatRate}%)</span>
@@ -626,7 +711,7 @@ export default function Purchases() {
                 <Input value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
               </div>
               <Button type="submit" className="w-full" disabled={saving}>
-                {saving ? "جاري الحفظ..." : editId ? "حفظ التعديلات" : "حفظ الفاتورة"}
+                {saving ? "جاري الحفظ..." : editId ? "حفظ التعديلات" : "حفظ المرتجع"}
               </Button>
             </form>
           </DialogContent>
@@ -685,7 +770,7 @@ export default function Purchases() {
                 <TableCell className="font-bold">{p.grandTotal?.toLocaleString()} ر.س</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" title="طباعة الفاتورة" onClick={() => printPurchaseInvoice(p)}>
+                    <Button variant="ghost" size="icon" title="طباعة الفاتورة" onClick={() => printPurchaseReturnInvoice(p)}>
                       <Printer className="w-4 h-4 text-green-600" />
                     </Button>
                     <Button variant="ghost" size="icon" title="تعديل" onClick={() => openEdit(p)}>

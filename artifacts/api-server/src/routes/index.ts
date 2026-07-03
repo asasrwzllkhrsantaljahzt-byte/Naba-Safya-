@@ -22,6 +22,10 @@ import adminAuthRouter from "./adminAuth";
 import repPortalRouter from "./repPortal";
 import operationalCostsRouter from "./operationalCosts";
 import settingsRouter from "./settings";
+import journalRouter from "./journal";
+import warehousesRouter from "./warehouses";
+import purchaseReturnsRouter from "./purchaseReturns";
+import saleReturnsRouter from "./saleReturns";
 
 const router: IRouter = Router();
 
@@ -48,5 +52,9 @@ router.use(payrollRouter);
 router.use(costCentersRouter);
 router.use(repCustodyRouter);
 router.use(obligationsRouter);
+router.use(journalRouter);
+router.use(warehousesRouter);
+router.use(purchaseReturnsRouter);
+router.use(saleReturnsRouter);
 
 export default router;

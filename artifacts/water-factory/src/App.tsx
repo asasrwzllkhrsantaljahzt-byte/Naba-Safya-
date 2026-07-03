@@ -28,9 +28,13 @@ import RepLogin from "@/pages/rep-login";
 import RepPortal from "@/pages/rep-portal";
 import Settings from "@/pages/settings";
 import Accounts from "@/pages/accounts";
+import Warehouses from "@/pages/warehouses";
+import PurchaseReturns from "@/pages/purchase-returns";
+import SaleReturns from "@/pages/sale-returns";
 import InventoryProducts from "@/pages/inventory-products";
 import Login from "@/pages/login";
 import Users from "@/pages/users";
+import Journal from "@/pages/journal";
 import NotFound from "@/pages/not-found";
 import { queryClient } from "@/lib/utils";
 
@@ -103,8 +107,10 @@ function AdminRouter() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/purchases" component={Purchases} />
+        <Route path="/purchase-orders" component={Purchases} />
         <Route path="/suppliers" component={Suppliers} />
         <Route path="/sales" component={Sales} />
+        <Route path="/sale-orders" component={Sales} />
         <Route path="/customers" component={Customers} />
         <Route path="/reps" component={Reps} />
         <Route path="/inventory" component={Inventory} />
@@ -123,7 +129,11 @@ function AdminRouter() {
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={Settings} />
         <Route path="/accounts" component={Accounts} />
+        <Route path="/warehouses" component={Warehouses} />
+        <Route path="/purchase-returns" component={PurchaseReturns} />
+        <Route path="/sale-returns" component={SaleReturns} />
         <Route path="/users" component={Users} />
+        <Route path="/journal" component={Journal} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

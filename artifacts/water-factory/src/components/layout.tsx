@@ -20,7 +20,7 @@ const nav: NavItem[] = [
     name: "المالية", icon: Wallet,
     sub: [
       { name: "خزينة وبنوك", href: "/treasury" },
-      { name: "القيود المحاسبية", href: "/journal-entries" },
+      { name: "القيود المحاسبية", href: "/journal" },
       { name: "دليل الحسابات", href: "/accounts" },
     ]
   },
@@ -45,6 +45,7 @@ const nav: NavItem[] = [
   {
     name: "المخازن", icon: Package,
     sub: [
+      { name: "إدارة المخازن", href: "/warehouses" },
       { name: "المنتجات", href: "/inventory/products" },
       { name: "الحركات", href: "/inventory/transactions" },
       { name: "تسوية مخزن", href: "/inventory/vouchers" },
@@ -104,7 +105,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
         desc: e.category ?? "",
         time: e.date, amount: parseFloat(e.amount),
       }));
-      (obligations as any[]).filter(o => o.dueDate === today && parseFloat(o.remainingAmount ?? o.totalAmount) > 0).forEach(o => result.push({
+      (Array.isArray(obligations) ? obligations : []).filter(o => o.dueDate === today && parseFloat(o.remainingAmount ?? o.totalAmount) > 0).forEach(o => result.push({
         id: `obl-${o.id}`, type: "payment",
         title: `التزام مستحق - ${o.supplierName}`,
         desc: `المتبقي: ${parseFloat(o.remainingAmount ?? o.totalAmount).toFixed(2)} ر.س`,

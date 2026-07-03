@@ -13,14 +13,16 @@ export const salesTable = pgTable("sales", {
   date: text("date").notNull(),
   customerId: integer("customer_id").notNull().references(() => customersTable.id),
   customerName: text("customer_name").notNull(),
-  repId: integer("rep_id").notNull().references(() => repsTable.id),
-  repName: text("rep_name").notNull(),
+  repId: integer("rep_id").references(() => repsTable.id),
+  repName: text("rep_name"),
+  accountId: integer("account_id"),
   items: jsonb("items").notNull().$type<Array<{
     productId: number;
     productName: string;
     quantity: number;
     unitPrice: number;
     vatRate: number;
+    vatEnabled: boolean;
     subtotal: number;
   }>>(),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),

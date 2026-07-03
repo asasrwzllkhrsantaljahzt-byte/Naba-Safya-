@@ -13,6 +13,7 @@ export const customersTable = pgTable("customers", {
   bottleBalance: integer("bottle_balance").notNull().default(0),
   lastVisitDate: text("last_visit_date"),
   notes: text("notes"),
+  accountId: integer("account_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
